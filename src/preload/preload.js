@@ -44,7 +44,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
                   'db:save-room-type',
                   'db:delete-room-type',
                   'db:apply-global-price',
-                  'db:apply-type-price'
+                  'db:apply-type-price',
+                  'db:save-item',
+                  'db:delete-item',
+                  'db:add-record-item',
+                  'db:remove-record-item',
+                  'db:update-record-item',
+                  'db:update-record-times'
             ]
             if (allowedChannels.includes(channel)) {
                   return ipcRenderer.invoke(channel, ...args)

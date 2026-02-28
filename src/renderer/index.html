@@ -99,6 +99,12 @@
             </svg>
             Loại phòng
           </button>
+          <button class="admin-menu-item" data-section="admin-items">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
+            </svg>
+            Sản phẩm
+          </button>
           <button class="admin-menu-item" data-section="admin-pricing">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -223,7 +229,7 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>#</th><th>Giờ vào</th><th>Giờ ra</th><th>Thời gian</th><th>Thành tiền</th><th>Trạng thái</th>
+                  <th style="width:36px">#</th><th style="width:100px">Giờ vào</th><th style="width:100px">Giờ ra</th><th style="width:90px">Thời gian</th><th style="width:110px">Sản phẩm</th><th style="width:120px">Thành tiền</th><th style="width:100px">Trạng thái</th>
                 </tr>
               </thead>
               <tbody id="records-body"></tbody>
@@ -293,6 +299,32 @@
           </div>
         </div>
 
+        <!-- Section: Items -->
+        <div id="admin-items" class="admin-section" style="display:none;">
+          <div class="admin-section-header">
+            <h2>Quản lý sản phẩm</h2>
+            <button id="admin-btn-add-item" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Thêm sản phẩm
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Tên sản phẩm</th><th>Danh mục</th><th>Giá</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="admin-items-body"></tbody>
+            </table>
+            <div id="admin-items-empty" class="no-records" style="display:none;">
+              <p>Chưa có sản phẩm nào</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Section: Pricing -->
         <div id="admin-pricing" class="admin-section" style="display:none;">
           <div class="admin-section-header">
@@ -337,6 +369,24 @@
             <h2>Thống kê</h2>
           </div>
 
+          <!-- Date range filter -->
+          <div class="stats-filter-bar">
+            <div class="stats-filter-presets">
+              <button class="btn btn-sm btn-ghost stats-preset active" data-preset="today">Hôm nay</button>
+              <button class="btn btn-sm btn-ghost stats-preset" data-preset="week">7 ngày</button>
+              <button class="btn btn-sm btn-ghost stats-preset" data-preset="month">Tháng này</button>
+              <button class="btn btn-sm btn-ghost stats-preset" data-preset="custom">Tùy chọn</button>
+            </div>
+            <div class="stats-filter-dates" id="stats-custom-dates" style="display:none;">
+              <label class="form-label" style="margin:0;align-self:center;">Từ</label>
+              <input type="date" id="stats-date-start" class="form-input form-input--sm" />
+              <label class="form-label" style="margin:0;align-self:center;">Đến</label>
+              <input type="date" id="stats-date-end" class="form-input form-input--sm" />
+              <button id="stats-btn-apply" class="btn btn-sm btn-primary">Xem</button>
+            </div>
+          </div>
+
+          <!-- Summary cards -->
           <div class="stats-row">
             <div class="stat-card">
               <div class="stat-card-icon stat-card-icon--green">
@@ -345,8 +395,8 @@
                 </svg>
               </div>
               <div class="stat-card-info">
-                <span class="stat-card-label">Doanh thu hôm nay</span>
-                <span class="stat-card-value" id="stats-revenue-today">0₫</span>
+                <span class="stat-card-label" id="stats-period-label">Doanh thu hôm nay</span>
+                <span class="stat-card-value" id="stats-revenue-period">0₫</span>
               </div>
             </div>
             <div class="stat-card">
@@ -356,19 +406,19 @@
                 </svg>
               </div>
               <div class="stat-card-info">
-                <span class="stat-card-label">Doanh thu tháng này</span>
-                <span class="stat-card-value" id="stats-revenue-month">0₫</span>
+                <span class="stat-card-label">Tiền giờ</span>
+                <span class="stat-card-value" id="stats-revenue-hourly">0₫</span>
               </div>
             </div>
             <div class="stat-card">
               <div class="stat-card-icon stat-card-icon--purple">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
                 </svg>
               </div>
               <div class="stat-card-info">
-                <span class="stat-card-label">Tổng doanh thu</span>
-                <span class="stat-card-value" id="stats-revenue-all">0₫</span>
+                <span class="stat-card-label">Tiền sản phẩm</span>
+                <span class="stat-card-value" id="stats-revenue-items">0₫</span>
               </div>
             </div>
             <div class="stat-card">
@@ -384,14 +434,26 @@
             </div>
           </div>
 
-          <!-- Revenue by Room -->
+          <!-- Charts -->
+          <div class="stats-charts">
+            <div class="stats-chart-card">
+              <h3 class="stats-chart-title">Doanh thu theo ngày</h3>
+              <div class="stats-chart-wrap"><canvas id="chart-revenue-daily"></canvas></div>
+            </div>
+            <div class="stats-chart-card">
+              <h3 class="stats-chart-title">Doanh thu theo phòng</h3>
+              <div class="stats-chart-wrap stats-chart-wrap--sm"><canvas id="chart-revenue-room"></canvas></div>
+            </div>
+          </div>
+
+          <!-- Revenue by Room Table -->
           <div style="margin-top: 24px;">
-            <h3 style="font-size:16px; font-weight:600; margin-bottom:12px;">Doanh thu theo phòng</h3>
+            <h3 style="font-size:16px; font-weight:600; margin-bottom:12px;">Chi tiết theo phòng</h3>
             <div class="table-container">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>#</th><th>Phòng</th><th>Loại</th><th>Lượt sử dụng</th><th>Tổng giờ</th><th>Doanh thu</th>
+                    <th>#</th><th>Phòng</th><th>Loại</th><th>Lượt</th><th>Tổng giờ</th><th>Tổng</th>
                   </tr>
                 </thead>
                 <tbody id="stats-room-body"></tbody>
@@ -428,6 +490,9 @@
   <!-- ─── Toast ────────────────────────────────────────────── -->
   <div id="toast-container" class="toast-container"></div>
 
+  <script src="scripts/lib/chart.min.js"></script>
+  <script src="scripts/utils/helpers.js"></script>
+  <script src="scripts/utils/toast.js"></script>
   <script src="scripts/renderer.js"></script>
 </body>
 

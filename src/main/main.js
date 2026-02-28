@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { connectDB, Room, RoomType } = require('./db')
+const { connectDB, Room, RoomType, Item } = require('./db')
 
 const isDev = process.argv.includes('--dev')
 
@@ -36,9 +36,24 @@ async function createWindow() {
 ipcMain.handle('db:get-data', async () => {
   const rooms = await Room.find().lean()
   const roomTypes = await RoomType.find().lean()
+  const items = await Item.find().lean()
   return {
-    rooms: rooms.map(r => ({ ...r, id: r._id.toString(), roomTypeId: r.roomTypeId?.toString() })),
-    roomTypes: roomTypes.map(t => ({ ...t, id: t._id.toString() }))
+    rooms: rooms.map(r => ({
+      ...r,
+      id: r._id.toString(),
+      roomTypeId: r.roomTypeId?.toString(),
+      records: r.records.map(rec => ({
+        ...rec,
+        _id: rec._id.toString(),
+        items: (rec.items || []).map(ri => ({
+          ...ri,
+          _id: ri._id.toString(),
+          itemId: ri.itemId?.toString()
+        }))
+      }))
+    })),
+    roomTypes: roomTypes.map(t => ({ ...t, id: t._id.toString() })),
+    items: items.map(i => ({ ...i, id: i._id.toString() }))
   }
 })
 
@@ -121,6 +136,74 @@ ipcMain.handle('db:apply-type-price', async (event, { typeId, price }) => {
 ipcMain.handle('db:apply-global-price', async (event, price) => {
   const result = await Room.updateMany({}, { pricePerHour: price })
   return { success: true, modifiedCount: result.modifiedCount }
+})
+
+// ─── Item Handlers ──────────────────────────────────────────
+ipcMain.handle('db:save-item', async (event, data) => {
+  let result
+  if (data.id && data.id.length === 24) {
+    result = await Item.findByIdAndUpdate(data.id, {
+      name: data.name,
+      price: data.price,
+      category: data.category || ''
+    }, { new: true })
+  } else {
+    const item = new Item({
+      name: data.name,
+      price: data.price,
+      category: data.category || ''
+    })
+    result = await item.save()
+  }
+  return result ? result.toObject() : null
+})
+
+ipcMain.handle('db:delete-item', async (event, id) => {
+  const result = await Item.findByIdAndDelete(id)
+  return result ? result.toObject() : null
+})
+
+ipcMain.handle('db:add-record-item', async (event, { roomId, recordId, itemId, name, price, quantity }) => {
+  const room = await Room.findById(roomId)
+  const record = room.records.id(recordId)
+  if (!record) return null
+  const existing = record.items.find(i => i.itemId?.toString() === itemId)
+  if (existing) {
+    existing.quantity += quantity
+  } else {
+    record.items.push({ itemId, name, price, quantity })
+  }
+  const result = await room.save()
+  return result.toObject()
+})
+
+ipcMain.handle('db:remove-record-item', async (event, { roomId, recordId, recordItemId }) => {
+  const room = await Room.findById(roomId)
+  const record = room.records.id(recordId)
+  if (!record) return null
+  record.items = record.items.filter(i => i._id.toString() !== recordItemId)
+  const result = await room.save()
+  return result.toObject()
+})
+
+ipcMain.handle('db:update-record-item', async (event, { roomId, recordId, recordItemId, quantity }) => {
+  const room = await Room.findById(roomId)
+  const record = room.records.id(recordId)
+  if (!record) return null
+  const item = record.items.find(i => i._id.toString() === recordItemId)
+  if (item) item.quantity = quantity
+  const result = await room.save()
+  return result.toObject()
+})
+
+ipcMain.handle('db:update-record-times', async (event, { roomId, recordId, checkIn, checkOut }) => {
+  const room = await Room.findById(roomId)
+  const record = room.records.id(recordId)
+  if (!record) return null
+  if (checkIn) record.checkIn = new Date(checkIn)
+  if (checkOut !== undefined) record.checkOut = checkOut ? new Date(checkOut) : null
+  const result = await room.save()
+  return result.toObject()
 })
 
 ipcMain.on('window:minimize', () => mainWindow?.minimize())

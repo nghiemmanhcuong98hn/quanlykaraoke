@@ -2,6 +2,16 @@ const mongoose = require('mongoose')
 const path = require('path')
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') })
 
+const itemSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  price: { type: Number, default: 0 },
+  category: { type: String, default: '' }
+}, {
+  timestamps: true,
+  toObject: { virtuals: true },
+  toJSON: { virtuals: true }
+})
+
 const roomTypeSchema = new mongoose.Schema({
   name: { type: String, required: true },
   defaultPrice: { type: Number, default: 0 }
@@ -11,9 +21,17 @@ const roomTypeSchema = new mongoose.Schema({
   toJSON: { virtuals: true }
 })
 
+const recordItemSchema = new mongoose.Schema({
+  itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+  name: { type: String, required: true },
+  price: { type: Number, default: 0 },
+  quantity: { type: Number, default: 1 }
+})
+
 const recordSchema = new mongoose.Schema({
   checkIn: { type: Date, required: true },
-  checkOut: { type: Date, default: null }
+  checkOut: { type: Date, default: null },
+  items: [recordItemSchema]
 })
 
 const roomSchema = new mongoose.Schema({
@@ -29,6 +47,7 @@ const roomSchema = new mongoose.Schema({
 
 const Room = mongoose.model('Room', roomSchema)
 const RoomType = mongoose.model('RoomType', roomTypeSchema)
+const Item = mongoose.model('Item', itemSchema)
 
 async function connectDB() {
   try {
@@ -41,4 +60,4 @@ async function connectDB() {
   }
 }
 
-module.exports = { connectDB, Room, RoomType }
+module.exports = { connectDB, Room, RoomType, Item }

@@ -5,11 +5,16 @@
 // ─── State ──────────────────────────────────────────────────
 let rooms = []
 let roomTypes = []
+let items = []
 let selectedRoomId = null
 let currentPage = 'checkin'
 let currentAdminSection = 'admin-rooms'
-let modalMode = null // 'add-room' | 'edit-room' | 'add-type' | 'edit-type'
+let modalMode = null // 'add-room' | 'edit-room' | 'add-type' | 'edit-type' | 'add-item' | 'edit-item' | 'record-items'
 let editingId = null
+let editingRoomId = null // used for record-items modal
+let statsPreset = 'today'
+let chartDailyInstance = null
+let chartRoomInstance = null
 
 // ─── DOM Cache ──────────────────────────────────────────────
 const $ = (sel) => document.querySelector(sel)
@@ -44,15 +49,24 @@ const dom = {
   adminRoomsEmpty: $('#admin-rooms-empty'),
   adminTypesBody: $('#admin-types-body'),
   adminTypesEmpty: $('#admin-types-empty'),
+  adminItemsBody: $('#admin-items-body'),
+  adminItemsEmpty: $('#admin-items-empty'),
   globalPriceInput: $('#global-price-input'),
   pricingTypesList: $('#pricing-types-list'),
   pricingNoTypes: $('#pricing-no-types'),
   // Stats
-  statsRevenueToday: $('#stats-revenue-today'),
-  statsRevenueMonth: $('#stats-revenue-month'),
-  statsRevenueAll: $('#stats-revenue-all'),
+  statsPeriodLabel: $('#stats-period-label'),
+  statsRevenuePeriod: $('#stats-revenue-period'),
+  statsRevenueHourly: $('#stats-revenue-hourly'),
+  statsRevenueItems: $('#stats-revenue-items'),
   statsTotalUsage: $('#stats-total-usage'),
   statsRoomBody: $('#stats-room-body'),
+  statsCustomDates: $('#stats-custom-dates'),
+  statsDateStart: $('#stats-date-start'),
+  statsDateEnd: $('#stats-date-end'),
+  statsBtnApply: $('#stats-btn-apply'),
+  chartRevenueDaily: $('#chart-revenue-daily'),
+  chartRevenueRoom: $('#chart-revenue-room'),
   // Modal
   modalOverlay: $('#modal-overlay'),
   modalTitle: $('#modal-title'),
@@ -72,73 +86,18 @@ async function loadData() {
     const data = await window.electronAPI.invoke('db:get-data')
     rooms = data.rooms || []
     roomTypes = data.roomTypes || []
+    items = data.items || []
   } catch (err) {
     console.error('Failed to load data:', err)
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-// HELPERS
+// STATE HELPERS (depend on app state)
 // ═══════════════════════════════════════════════════════════
-function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7) }
-
-function formatTime(dateStr) {
-  if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
-}
-
-function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' })
-}
-
-function getDurationMs(checkIn, checkOut) {
-  if (!checkIn) return 0
-  return Math.max(0, (checkOut ? new Date(checkOut) : new Date()) - new Date(checkIn))
-}
-
-function formatDuration(checkIn, checkOut) {
-  if (!checkIn) return '—'
-  const s = Math.floor(getDurationMs(checkIn, checkOut) / 1000)
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
-  if (h > 0) return `${h}h ${m}m ${sec}s`
-  if (m > 0) return `${m}m ${sec}s`
-  return `${sec}s`
-}
-
-function formatDurationShort(ms) {
-  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000)
-  return `${h}h ${m}m`
-}
-
-function calculateCost(checkIn, checkOut, pricePerHour) {
-  if (!checkIn || !pricePerHour) return 0
-  return Math.ceil((getDurationMs(checkIn, checkOut) / 3600000) * pricePerHour)
-}
-
-function formatMoney(amount) {
-  if (!amount) return '0₫'
-  return amount.toLocaleString('vi-VN') + '₫'
-}
-
-function isToday(dateStr) {
-  const d = new Date(dateStr), n = new Date()
-  return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear()
-}
-
-function isThisMonth(dateStr) {
-  const d = new Date(dateStr), n = new Date()
-  return d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear()
-}
-
 function getSelectedRoom() { return rooms.find(r => r.id === selectedRoomId) }
 function isRoomOccupied(room) { return room && room.records.some(r => !r.checkOut) }
 function getRoomTypeName(typeId) { const t = roomTypes.find(t => t.id === typeId); return t ? t.name : '—' }
-
-function escapeHtml(str) {
-  const div = document.createElement('div')
-  div.textContent = str
-  return div.innerHTML
-}
 
 // ═══════════════════════════════════════════════════════════
 // NAVIGATION
@@ -169,6 +128,7 @@ function switchAdminSection(section) {
 function renderAdminSection(section) {
   if (section === 'admin-rooms') renderAdminRooms()
   else if (section === 'admin-room-types') renderAdminRoomTypes()
+  else if (section === 'admin-items') renderAdminItems()
   else if (section === 'admin-pricing') renderAdminPricing()
   else if (section === 'admin-stats') renderAdminStats()
 }
@@ -238,16 +198,46 @@ function renderRecords(room) {
 
   records.forEach((rec, i) => {
     const active = !rec.checkOut
-    const cost = calculateCost(rec.checkIn, rec.checkOut, room.pricePerHour)
+    const hourlyCost = calculateCost(rec.checkIn, rec.checkOut, room.pricePerHour)
+    const itemsCost = calculateItemsCost(rec.items)
+    const totalCost = hourlyCost + itemsCost
+    const itemCount = rec.items ? rec.items.reduce((sum, item) => sum + item.quantity, 0) : 0
+    const recId = rec._id
     const tr = document.createElement('tr')
+    tr.className = 'record-row-clickable'
+    tr.dataset.roomId = room.id
+    tr.dataset.recordId = recId
     tr.innerHTML = `
       <td style="color:var(--text-tertiary);font-size:12px;">${records.length-i}</td>
       <td><span class="time-value">${formatTime(rec.checkIn)}</span><div style="font-size:11px;color:var(--text-tertiary);margin-top:1px">${formatDate(rec.checkIn)}</div></td>
       <td><span class="time-value">${active ? '—' : formatTime(rec.checkOut)}</span>${!active ? `<div style="font-size:11px;color:var(--text-tertiary);margin-top:1px">${formatDate(rec.checkOut)}</div>` : ''}</td>
-      <td><span class="duration-value">${formatDuration(rec.checkIn, rec.checkOut)}</span></td>
-      <td><span class="money-value">${room.pricePerHour ? formatMoney(cost) : '—'}</span></td>
+      <td><span class="duration-value" data-live-duration="${active ? recId : ''}" ${active ? `data-checkin="${rec.checkIn}"` : ''}>${formatDuration(rec.checkIn, rec.checkOut)}</span></td>
+      <td><button class="btn-record-items" data-room-id="${room.id}" data-record-id="${recId}">${itemCount > 0
+          ? `<span class="record-items-badge">${itemCount}</span> <span class="record-items-cost">${formatMoney(itemsCost)}</span>`
+          : '<span class="record-items-add">+ Thêm</span>'
+        }</button></td>
+      <td>
+        <div class="record-cost-breakdown">
+          <span class="money-value" data-live-cost="${active ? recId : ''}" ${active ? `data-checkin="${rec.checkIn}" data-price="${room.pricePerHour}" data-items-cost="${itemsCost}"` : ''}>${(room.pricePerHour || itemsCost) ? formatMoney(totalCost) : '—'}</span>
+          ${(room.pricePerHour && itemsCost) ? `<span class="record-cost-detail" data-live-cost-detail="${active ? recId : ''}" ${active ? `data-checkin="${rec.checkIn}" data-price="${room.pricePerHour}" data-items-cost="${itemsCost}"` : ''}>${formatMoney(hourlyCost)} + ${formatMoney(itemsCost)}</span>` : ''}
+        </div>
+      </td>
       <td><span class="status-badge ${active ? 'status-badge--active' : 'status-badge--done'}"><span class="status-dot ${active ? 'status-dot--active' : ''}"></span>${active ? 'Trong phòng' : 'Đã ra'}</span></td>`
     dom.recordsBody.appendChild(tr)
+  })
+
+  // Bind row click for record detail
+  dom.recordsBody.querySelectorAll('.record-row-clickable').forEach(tr => {
+    tr.addEventListener('click', (e) => {
+      // Don't open detail if clicking on the items button
+      if (e.target.closest('.btn-record-items')) return
+      openRecordDetailModal(tr.dataset.roomId, tr.dataset.recordId)
+    })
+  })
+
+  // Bind record items buttons
+  dom.recordsBody.querySelectorAll('.btn-record-items').forEach(btn => {
+    btn.addEventListener('click', () => openRecordItemsModal(btn.dataset.roomId, btn.dataset.recordId))
   })
 }
 
@@ -314,6 +304,35 @@ function renderAdminRoomTypes() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// RENDER — Admin: Items
+// ═══════════════════════════════════════════════════════════
+function renderAdminItems() {
+  if (!items.length) { dom.adminItemsBody.innerHTML=''; dom.adminItemsEmpty.style.display=''; return }
+  dom.adminItemsEmpty.style.display='none'
+  dom.adminItemsBody.innerHTML = ''
+  items.forEach((item, i) => {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td style="color:var(--text-tertiary);font-size:12px">${i+1}</td>
+      <td><span class="time-value">${escapeHtml(item.name)}</span></td>
+      <td>${item.category ? escapeHtml(item.category) : '—'}</td>
+      <td><span class="money-value">${formatMoney(item.price)}</span></td>
+      <td><div class="table-actions">
+        <button class="btn-icon btn-edit-item" data-id="${item.id}" title="Sửa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="btn-icon btn-icon--danger btn-del-item" data-id="${item.id}" title="Xóa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div></td>`
+    dom.adminItemsBody.appendChild(tr)
+  })
+
+  dom.adminItemsBody.querySelectorAll('.btn-edit-item').forEach(btn => {
+    btn.addEventListener('click', () => openEditItemModal(btn.dataset.id))
+  })
+  dom.adminItemsBody.querySelectorAll('.btn-del-item').forEach(btn => {
+    btn.addEventListener('click', () => { if(confirm('Xóa sản phẩm này?')) deleteItem(btn.dataset.id) })
+  })
+}
+
+// ═══════════════════════════════════════════════════════════
 // RENDER — Admin: Pricing
 // ═══════════════════════════════════════════════════════════
 function renderAdminPricing() {
@@ -351,33 +370,219 @@ function renderAdminPricing() {
 // ═══════════════════════════════════════════════════════════
 // RENDER — Admin: Stats
 // ═══════════════════════════════════════════════════════════
-function renderAdminStats() {
-  let revenueToday = 0, revenueMonth = 0, revenueAll = 0, totalUsage = 0
 
-  const roomStats = rooms.map(room => {
-    let roomRevenue = 0, roomDurationMs = 0, roomUsage = 0
+function getStatsDateRange() {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const todayEnd = new Date(todayStart.getTime() + 86400000)
+
+  if (statsPreset === 'today') {
+    return { start: todayStart, end: todayEnd, label: 'Doanh thu hôm nay' }
+  } else if (statsPreset === 'week') {
+    const weekStart = new Date(todayEnd.getTime() - 7 * 86400000)
+    return { start: weekStart, end: todayEnd, label: 'Doanh thu 7 ngày qua' }
+  } else if (statsPreset === 'month') {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    return { start: monthStart, end: todayEnd, label: 'Doanh thu tháng này' }
+  } else if (statsPreset === 'custom') {
+    const s = dom.statsDateStart.value
+    const e = dom.statsDateEnd.value
+    const start = s ? new Date(s) : new Date(0)
+    const end = e ? new Date(new Date(e).getTime() + 86400000) : todayEnd
+    const label = s && e ? `Doanh thu ${formatDate(s)} — ${formatDate(e)}` : 'Doanh thu tùy chọn'
+    return { start, end, label }
+  } else {
+    return { start: new Date(0), end: todayEnd, label: 'Tổng doanh thu' }
+  }
+}
+
+function collectFilteredRecords(start, end) {
+  const allRecords = []
+  rooms.forEach(room => {
     room.records.forEach(rec => {
       if (!rec.checkOut) return
-      const cost = calculateCost(rec.checkIn, rec.checkOut, room.pricePerHour)
-      const dur = getDurationMs(rec.checkIn, rec.checkOut)
-      roomRevenue += cost
-      roomDurationMs += dur
-      roomUsage++
-      revenueAll += cost
-      totalUsage++
-      if (isToday(rec.checkOut)) revenueToday += cost
-      if (isThisMonth(rec.checkOut)) revenueMonth += cost
+      const coDate = new Date(rec.checkOut)
+      if (coDate >= start && coDate < end) {
+        const hourlyCost = calculateCost(rec.checkIn, rec.checkOut, room.pricePerHour)
+        const itemsCost = calculateItemsCost(rec.items)
+        allRecords.push({
+          room, rec, hourlyCost, itemsCost,
+          totalCost: hourlyCost + itemsCost,
+          durationMs: getDurationMs(rec.checkIn, rec.checkOut),
+          checkOutDate: coDate
+        })
+      }
     })
-    return { room, roomRevenue, roomDurationMs, roomUsage }
+  })
+  return allRecords
+}
+
+function buildDailyData(records, start, end) {
+  const dayMap = {}
+  // Generate all dates in range
+  const cur = new Date(start)
+  while (cur < end) {
+    const key = cur.toISOString().slice(0, 10)
+    dayMap[key] = { hourly: 0, items: 0 }
+    cur.setDate(cur.getDate() + 1)
+  }
+  records.forEach(r => {
+    const key = r.checkOutDate.toISOString().slice(0, 10)
+    if (dayMap[key]) {
+      dayMap[key].hourly += r.hourlyCost
+      dayMap[key].items += r.itemsCost
+    }
+  })
+  const labels = Object.keys(dayMap).map(k => {
+    const d = new Date(k)
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+  })
+  return {
+    labels,
+    hourly: Object.values(dayMap).map(v => v.hourly),
+    items: Object.values(dayMap).map(v => v.items)
+  }
+}
+
+function renderChart_Daily(dailyData) {
+  if (chartDailyInstance) chartDailyInstance.destroy()
+  const ctx = dom.chartRevenueDaily.getContext('2d')
+  chartDailyInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dailyData.labels,
+      datasets: [
+        {
+          label: 'Tiền giờ',
+          data: dailyData.hourly,
+          backgroundColor: 'rgba(99,102,241,0.7)',
+          borderRadius: 4,
+          barPercentage: 0.6,
+          categoryPercentage: 0.7
+        },
+        {
+          label: 'Tiền sản phẩm',
+          data: dailyData.items,
+          backgroundColor: 'rgba(245,158,11,0.7)',
+          borderRadius: 4,
+          barPercentage: 0.6,
+          categoryPercentage: 0.7
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#8b8b9e', font: { size: 11, family: 'Inter' }, boxWidth: 12, padding: 16 }
+        },
+        tooltip: {
+          backgroundColor: '#1a1a24',
+          titleColor: '#f0f0f5',
+          bodyColor: '#8b8b9e',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${formatMoney(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#5a5a6e', font: { size: 10, family: 'Inter' } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#5a5a6e',
+            font: { size: 10, family: 'Inter' },
+            callback: v => v >= 1000000 ? (v/1000000).toFixed(1) + 'M' : v >= 1000 ? (v/1000) + 'K' : v
+          }
+        }
+      }
+    }
+  })
+}
+
+function renderChart_Room(roomStats) {
+  if (chartRoomInstance) chartRoomInstance.destroy()
+  const top = roomStats.slice(0, 8)
+  const colors = [
+    'rgba(99,102,241,0.8)', 'rgba(34,197,94,0.8)', 'rgba(245,158,11,0.8)',
+    'rgba(239,68,68,0.8)', 'rgba(168,85,247,0.8)', 'rgba(6,182,212,0.8)',
+    'rgba(244,114,182,0.8)', 'rgba(132,204,22,0.8)'
+  ]
+  const ctx = dom.chartRevenueRoom.getContext('2d')
+  chartRoomInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: top.map(rs => rs.room.name),
+      datasets: [{
+        data: top.map(rs => rs.totalRevenue),
+        backgroundColor: colors.slice(0, top.length),
+        borderColor: '#111118',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: '#8b8b9e', font: { size: 11, family: 'Inter' }, boxWidth: 12, padding: 10 }
+        },
+        tooltip: {
+          backgroundColor: '#1a1a24',
+          titleColor: '#f0f0f5',
+          bodyColor: '#8b8b9e',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            label: ctx => `${ctx.label}: ${formatMoney(ctx.raw)}`
+          }
+        }
+      }
+    }
+  })
+}
+
+function renderAdminStats() {
+  const { start, end, label } = getStatsDateRange()
+  const records = collectFilteredRecords(start, end)
+
+  let totalRevenue = 0, totalHourly = 0, totalItems = 0, totalUsage = records.length
+  records.forEach(r => {
+    totalRevenue += r.totalCost
+    totalHourly += r.hourlyCost
+    totalItems += r.itemsCost
   })
 
-  dom.statsRevenueToday.textContent = formatMoney(revenueToday)
-  dom.statsRevenueMonth.textContent = formatMoney(revenueMonth)
-  dom.statsRevenueAll.textContent = formatMoney(revenueAll)
+  dom.statsPeriodLabel.textContent = label
+  dom.statsRevenuePeriod.textContent = formatMoney(totalRevenue)
+  dom.statsRevenueHourly.textContent = formatMoney(totalHourly)
+  dom.statsRevenueItems.textContent = formatMoney(totalItems)
   dom.statsTotalUsage.textContent = totalUsage
 
-  // Table
-  roomStats.sort((a,b) => b.roomRevenue - a.roomRevenue)
+  // Room stats
+  const roomMap = {}
+  records.forEach(r => {
+    if (!roomMap[r.room.id]) roomMap[r.room.id] = { room: r.room, totalRevenue: 0, totalHourly: 0, totalItems: 0, durationMs: 0, usage: 0 }
+    const rs = roomMap[r.room.id]
+    rs.totalRevenue += r.totalCost
+    rs.totalHourly += r.hourlyCost
+    rs.totalItems += r.itemsCost
+    rs.durationMs += r.durationMs
+    rs.usage++
+  })
+  const roomStats = Object.values(roomMap).sort((a,b) => b.totalRevenue - a.totalRevenue)
+
   dom.statsRoomBody.innerHTML = ''
   roomStats.forEach((rs, i) => {
     const tr = document.createElement('tr')
@@ -385,11 +590,16 @@ function renderAdminStats() {
       <td style="color:var(--text-tertiary);font-size:12px">${i+1}</td>
       <td><span class="time-value">${escapeHtml(rs.room.name)}</span></td>
       <td>${getRoomTypeName(rs.room.roomTypeId)}</td>
-      <td>${rs.roomUsage}</td>
-      <td><span class="duration-value">${formatDurationShort(rs.roomDurationMs)}</span></td>
-      <td><span class="money-value">${formatMoney(rs.roomRevenue)}</span></td>`
+      <td>${rs.usage}</td>
+      <td><span class="duration-value">${formatDurationShort(rs.durationMs)}</span></td>
+      <td><span class="money-value">${formatMoney(rs.totalRevenue)}</span></td>`
     dom.statsRoomBody.appendChild(tr)
   })
+
+  // Charts
+  const dailyData = buildDailyData(records, start, end)
+  renderChart_Daily(dailyData)
+  renderChart_Room(roomStats)
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -519,6 +729,53 @@ async function applyTypePrice(typeId, price) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ACTIONS — Items (Admin CRUD)
+// ═══════════════════════════════════════════════════════════
+async function addItem(name, price, category) {
+  if (!name.trim()) return
+  await window.electronAPI.invoke('db:save-item', { name: name.trim(), price: parseInt(price) || 0, category: (category || '').trim() })
+  await loadData()
+  renderAdminItems()
+  showToast('Đã thêm sản phẩm', 'success')
+}
+
+async function editItem(id, name, price, category) {
+  if (!name.trim()) return
+  await window.electronAPI.invoke('db:save-item', { id, name: name.trim(), price: parseInt(price) || 0, category: (category || '').trim() })
+  await loadData()
+  renderAdminItems()
+  showToast('Đã cập nhật sản phẩm', 'success')
+}
+
+async function deleteItem(id) {
+  await window.electronAPI.invoke('db:delete-item', id)
+  await loadData()
+  renderAdminItems()
+  showToast('Đã xóa sản phẩm', 'danger')
+}
+
+// ═══════════════════════════════════════════════════════════
+// ACTIONS — Record Items
+// ═══════════════════════════════════════════════════════════
+async function addRecordItem(roomId, recordId, itemId, name, price, quantity) {
+  await window.electronAPI.invoke('db:add-record-item', { roomId, recordId, itemId, name, price, quantity })
+  await loadData()
+  renderRoomDetail()
+}
+
+async function removeRecordItem(roomId, recordId, recordItemId) {
+  await window.electronAPI.invoke('db:remove-record-item', { roomId, recordId, recordItemId })
+  await loadData()
+  renderRoomDetail()
+}
+
+async function updateRecordTimes(roomId, recordId, checkIn, checkOut) {
+  await window.electronAPI.invoke('db:update-record-times', { roomId, recordId, checkIn, checkOut })
+  await loadData()
+  renderRoomDetail()
+}
+
+// ═══════════════════════════════════════════════════════════
 // MODAL
 // ═══════════════════════════════════════════════════════════
 function buildRoomTypeOptions(selectedId) {
@@ -582,13 +839,321 @@ function openEditTypeModal(id) {
   dom.modalConfirm.textContent = 'Lưu'
   openModal()
 }
+function openAddItemModal() {
+  modalMode = 'add-item'; editingId = null
+  dom.modalTitle.textContent = 'Thêm sản phẩm'
+  dom.modalBody.innerHTML = `
+    <div class="form-group"><label class="form-label">Tên sản phẩm</label><input type="text" id="m-iname" class="form-input" placeholder="VD: Bia Tiger, Bim bim..." autofocus /></div>
+    <div class="form-group"><label class="form-label">Danh mục</label><input type="text" id="m-icategory" class="form-input" placeholder="VD: Đồ uống, Đồ ăn..." /></div>
+    <div class="form-group"><label class="form-label">Giá (₫)</label><input type="number" id="m-iprice" class="form-input" placeholder="VD: 15000" min="0" step="1000" /></div>`
+  dom.modalConfirm.textContent = 'Thêm'
+  openModal()
+}
 
+function openEditItemModal(id) {
+  const item = items.find(i => i.id === id)
+  if (!item) return
+  modalMode = 'edit-item'; editingId = id
+  dom.modalTitle.textContent = 'Sửa sản phẩm'
+  dom.modalBody.innerHTML = `
+    <div class="form-group"><label class="form-label">Tên sản phẩm</label><input type="text" id="m-iname" class="form-input" value="${escapeHtml(item.name)}" /></div>
+    <div class="form-group"><label class="form-label">Danh mục</label><input type="text" id="m-icategory" class="form-input" value="${escapeHtml(item.category || '')}" /></div>
+    <div class="form-group"><label class="form-label">Giá (₫)</label><input type="number" id="m-iprice" class="form-input" value="${item.price || ''}" min="0" step="1000" /></div>`
+  dom.modalConfirm.textContent = 'Lưu'
+  openModal()
+}
+
+function openRecordDetailModal(roomId, recordId) {
+  modalMode = 'record-detail'
+  editingId = recordId
+  editingRoomId = roomId
+  const room = rooms.find(r => r.id === roomId)
+  if (!room) return
+  const record = room.records.find(r => r._id === recordId)
+  if (!record) return
+
+  const active = !record.checkOut
+  const hourlyCost = calculateCost(record.checkIn, record.checkOut, room.pricePerHour)
+  const itemsCost = calculateItemsCost(record.items)
+  const totalCost = hourlyCost + itemsCost
+
+  // Format date and time separately for inputs
+  const formatDateInput = (d) => {
+    if (!d) return ''
+    const dt = new Date(d)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`
+  }
+  const formatTimeInput = (d) => {
+    if (!d) return ''
+    const dt = new Date(d)
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+  }
+
+  dom.modalTitle.textContent = `Chi tiết lượt #${room.records.indexOf(record) + 1}`
+
+  // Add wide class to modal
+  document.querySelector('.modal').classList.add('modal--wide')
+
+  // Items list
+  let itemsHtml = ''
+  if (record.items && record.items.length) {
+    record.items.forEach(ri => {
+      itemsHtml += `
+        <div class="record-item-row">
+          <span class="record-item-name">${escapeHtml(ri.name)}</span>
+          <span class="record-item-price">${formatMoney(ri.price)}</span>
+          <span class="record-item-qty">× ${ri.quantity}</span>
+          <span class="record-item-subtotal">${formatMoney(ri.price * ri.quantity)}</span>
+        </div>`
+    })
+  } else {
+    itemsHtml = '<div class="record-items-empty">Chưa có sản phẩm nào</div>'
+  }
+
+  dom.modalBody.innerHTML = `
+    <div class="record-detail-panel">
+      <div class="record-detail-times">
+        <div class="record-detail-time-row">
+          <span class="rd-label">Giờ vào</span>
+          <input type="date" id="m-rd-checkin-date" class="form-input" value="${formatDateInput(record.checkIn)}" />
+          <input type="time" id="m-rd-checkin-time" class="form-input" value="${formatTimeInput(record.checkIn)}" step="60" />
+        </div>
+        <div class="record-detail-time-row">
+          <span class="rd-label">Giờ ra</span>
+          <input type="date" id="m-rd-checkout-date" class="form-input" value="${formatDateInput(record.checkOut)}" />
+          <input type="time" id="m-rd-checkout-time" class="form-input" value="${formatTimeInput(record.checkOut)}" step="60" />
+        </div>
+        <div class="record-detail-times-actions">
+          <button id="m-rd-save-times" class="btn btn-sm btn-primary">Lưu thay đổi giờ</button>
+        </div>
+      </div>
+
+      <div class="record-detail-divider"></div>
+
+      <div class="record-detail-costs">
+        <div class="record-detail-cost-row">
+          <span class="record-detail-cost-label">Thời gian sử dụng</span>
+          <span class="record-detail-cost-value">${formatDuration(record.checkIn, record.checkOut)}</span>
+        </div>
+        <div class="record-detail-cost-row">
+          <span class="record-detail-cost-label">Tiền giờ <span style="color:var(--text-tertiary);font-weight:400">(${formatMoney(room.pricePerHour)}/h)</span></span>
+          <span class="record-detail-cost-value money-value">${formatMoney(hourlyCost)}</span>
+        </div>
+        <div class="record-detail-cost-row">
+          <span class="record-detail-cost-label">Tiền sản phẩm</span>
+          <span class="record-detail-cost-value money-value">${formatMoney(itemsCost)}</span>
+        </div>
+        <div class="record-detail-cost-row record-detail-cost-total">
+          <span class="record-detail-cost-label">Tổng cộng</span>
+          <span class="record-detail-cost-value">${formatMoney(totalCost)}</span>
+        </div>
+      </div>
+
+      <div class="record-detail-divider"></div>
+
+      <div class="record-detail-items-section">
+        <div class="record-detail-section-title">Sản phẩm đã dùng</div>
+        <div class="record-items-list">${itemsHtml}</div>
+      </div>
+
+      <div class="record-detail-actions">
+        ${!active ? `<button id="m-rd-reopen" class="btn btn-sm btn-reopen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Mở lại (tiếp tục tính giờ)</button>` : `<button id="m-rd-stop" class="btn btn-sm btn-stop-charge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Dừng tính tiền</button>`}
+        <button id="m-rd-delete" class="btn btn-sm btn-danger-outline">Xóa lượt này</button>
+      </div>
+    </div>`
+
+  dom.modalCancel.style.display = 'none'
+  dom.modalConfirm.textContent = 'Đóng'
+  dom.modalOverlay.style.display = ''
+
+  // Bind events
+  setTimeout(() => {
+    const saveBtn = $('#m-rd-save-times')
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const ciDate = $('#m-rd-checkin-date').value
+        const ciTime = $('#m-rd-checkin-time').value
+        const coDate = $('#m-rd-checkout-date').value
+        const coTime = $('#m-rd-checkout-time').value
+
+        if (!ciDate || !ciTime) { showToast('Giờ vào không được trống', 'warning'); return }
+
+        const checkInVal = `${ciDate}T${ciTime}`
+        let checkOutVal = null
+        if (coDate && coTime) {
+          checkOutVal = `${coDate}T${coTime}`
+          if (new Date(checkOutVal) <= new Date(checkInVal)) {
+            showToast('Giờ ra phải sau giờ vào', 'warning'); return
+          }
+        }
+
+        await updateRecordTimes(roomId, recordId, checkInVal, checkOutVal)
+        showToast('Đã cập nhật giờ', 'success')
+        openRecordDetailModal(roomId, recordId) // refresh
+      })
+    }
+
+    const reopenBtn = $('#m-rd-reopen')
+    if (reopenBtn) {
+      reopenBtn.addEventListener('click', async () => {
+        const currentRoom = rooms.find(r => r.id === roomId)
+        const hasActive = currentRoom && currentRoom.records.some(r => !r.checkOut)
+        if (hasActive) {
+          showToast('Phòng đang có lượt sử dụng khác chưa kết thúc. Hãy check-out trước.', 'warning')
+          return
+        }
+        if (confirm('Mở lại lượt này? Giờ ra sẽ bị xóa và bắt đầu tính tiếp.')) {
+          await updateRecordTimes(roomId, recordId, record.checkIn, null)
+          showToast('Đã mở lại — đang tính giờ tiếp', 'success')
+          openRecordDetailModal(roomId, recordId)
+        }
+      })
+    }
+
+    const stopBtn = $('#m-rd-stop')
+    if (stopBtn) {
+      stopBtn.addEventListener('click', async () => {
+        await checkOut(roomId)
+        showToast('Đã dừng tính tiền', 'warning')
+        openRecordDetailModal(roomId, recordId)
+      })
+    }
+
+    const deleteBtn = $('#m-rd-delete')
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        if (confirm('Xóa lượt vào/ra này?')) {
+          await deleteRecord(roomId, recordId)
+          showToast('Đã xóa lượt', 'danger')
+          closeModal()
+        }
+      })
+    }
+  }, 50)
+}
+
+function openRecordItemsModal(roomId, recordId) {
+  modalMode = 'record-items'
+  editingId = recordId
+  editingRoomId = roomId
+  const room = rooms.find(r => r.id === roomId)
+  if (!room) return
+  const record = room.records.find(r => r._id === recordId)
+  if (!record) return
+
+  dom.modalTitle.textContent = 'Sản phẩm sử dụng'
+
+  // Build items list
+  let itemsHtml = ''
+  if (record.items && record.items.length) {
+    record.items.forEach(ri => {
+      itemsHtml += `
+        <div class="record-item-row">
+          <span class="record-item-name">${escapeHtml(ri.name)}</span>
+          <span class="record-item-price">${formatMoney(ri.price)}</span>
+          <span class="record-item-qty-wrap">×<input type="number" class="record-item-qty-input" data-ri-id="${ri._id}" data-price="${ri.price}" value="${ri.quantity}" min="1" /></span>
+          <span class="record-item-subtotal" data-subtotal-id="${ri._id}">${formatMoney(ri.price * ri.quantity)}</span>
+          <button class="btn-icon btn-icon--danger btn-remove-ri" data-ri-id="${ri._id}" title="Xóa" style="width:24px;height:24px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`
+    })
+  } else {
+    itemsHtml = '<div class="record-items-empty">Chưa có sản phẩm nào</div>'
+  }
+
+  const totalItemsCost = calculateItemsCost(record.items)
+
+  // Build add item form
+  let selectOptions = '<option value="">— Chọn sản phẩm —</option>'
+  items.forEach(item => {
+    selectOptions += `<option value="${item.id}">${escapeHtml(item.name)} (${formatMoney(item.price)})</option>`
+  })
+
+  dom.modalBody.innerHTML = `
+    <div class="record-items-panel">
+      <div class="record-items-list">${itemsHtml}</div>
+      ${totalItemsCost ? `<div class="record-items-total">Tổng sản phẩm: <span class="total-amount">${formatMoney(totalItemsCost)}</span></div>` : ''}
+      <div class="record-items-add-form">
+        <select id="m-select-item" class="form-input">${selectOptions}</select>
+        <input type="number" id="m-item-qty" class="form-input" value="1" min="1" style="width:60px;text-align:center;" />
+        <button id="m-btn-add-ri" class="btn btn-sm btn-primary">Thêm</button>
+      </div>
+    </div>`
+
+  dom.modalCancel.style.display = 'none'
+  dom.modalConfirm.textContent = 'Đóng'
+  dom.modalOverlay.style.display = ''
+
+  // Bind events for record items modal
+  setTimeout(() => {
+    const addBtn = $('#m-btn-add-ri')
+    if (addBtn) {
+      addBtn.addEventListener('click', async () => {
+        const select = $('#m-select-item')
+        const qty = parseInt($('#m-item-qty').value) || 1
+        const itemId = select.value
+        if (!itemId) { showToast('Vui lòng chọn sản phẩm', 'warning'); return }
+        const item = items.find(i => i.id === itemId)
+        await addRecordItem(roomId, recordId, itemId, item.name, item.price, qty)
+        showToast(`Đã thêm ${item.name}`, 'success')
+        openRecordItemsModal(roomId, recordId) // refresh
+      })
+    }
+
+    document.querySelectorAll('.btn-remove-ri').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await removeRecordItem(roomId, recordId, btn.dataset.riId)
+        showToast('Đã xóa sản phẩm', 'danger')
+        openRecordItemsModal(roomId, recordId)
+      })
+    })
+
+    // Bind quantity edit
+    let qtyDebounce = null
+    document.querySelectorAll('.record-item-qty-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const price = parseFloat(input.dataset.price) || 0
+        const qty = parseInt(input.value) || 1
+        const subtotalEl = document.querySelector(`[data-subtotal-id="${input.dataset.riId}"]`)
+        if (subtotalEl) subtotalEl.textContent = formatMoney(price * qty)
+      })
+      input.addEventListener('change', () => {
+        clearTimeout(qtyDebounce)
+        const riId = input.dataset.riId
+        const qty = Math.max(1, parseInt(input.value) || 1)
+        input.value = qty
+        qtyDebounce = setTimeout(async () => {
+          await window.electronAPI.invoke('db:update-record-item', { roomId, recordId, recordItemId: riId, quantity: qty })
+          await loadData()
+          renderRoomDetail()
+          // Update total in modal
+          const room2 = rooms.find(r => r.id === roomId)
+          const record2 = room2 && room2.records.find(r => r._id === recordId)
+          const totalEl = document.querySelector('.record-items-total .total-amount')
+          if (totalEl && record2) totalEl.textContent = formatMoney(calculateItemsCost(record2.items))
+          showToast('Đã cập nhật số lượng', 'success')
+        }, 300)
+      })
+    })
+  }, 50)
+}
 function openModal() {
+  dom.modalCancel.style.display = ''
+  dom.modalConfirm.style.display = ''
   dom.modalOverlay.style.display = ''
   setTimeout(() => { const first = dom.modalBody.querySelector('input'); if(first) first.focus() }, 100)
 }
 
-function closeModal() { dom.modalOverlay.style.display = 'none'; modalMode = null; editingId = null }
+function closeModal() {
+  dom.modalOverlay.style.display = 'none'
+  dom.modalCancel.style.display = ''
+  dom.modalConfirm.style.display = ''
+  document.querySelector('.modal').classList.remove('modal--wide')
+  modalMode = null; editingId = null; editingRoomId = null
+}
 
 function submitModal() {
   if (modalMode === 'add-room') {
@@ -599,19 +1164,16 @@ function submitModal() {
     addRoomType($('#m-tname')?.value, $('#m-tprice')?.value)
   } else if (modalMode === 'edit-type') {
     editRoomType(editingId, $('#m-tname')?.value, $('#m-tprice')?.value)
+  } else if (modalMode === 'add-item') {
+    addItem($('#m-iname')?.value, $('#m-iprice')?.value, $('#m-icategory')?.value)
+  } else if (modalMode === 'edit-item') {
+    editItem(editingId, $('#m-iname')?.value, $('#m-iprice')?.value, $('#m-icategory')?.value)
+  } else if (modalMode === 'record-items') {
+    closeModal(); return
+  } else if (modalMode === 'record-detail') {
+    closeModal(); return
   }
   closeModal()
-}
-
-// ═══════════════════════════════════════════════════════════
-// TOAST
-// ═══════════════════════════════════════════════════════════
-function showToast(msg, type='info') {
-  const t = document.createElement('div')
-  t.className = `toast toast--${type}`
-  t.textContent = msg
-  dom.toastContainer.appendChild(t)
-  setTimeout(() => { t.classList.add('removing'); t.addEventListener('animationend', () => t.remove()) }, 3000)
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -637,6 +1199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   dom.btnAddRoom.addEventListener('click', openAddRoomModal)
   $('#admin-btn-add-room').addEventListener('click', openAddRoomModal)
   $('#admin-btn-add-type').addEventListener('click', openAddTypeModal)
+  $('#admin-btn-add-item').addEventListener('click', openAddItemModal)
 
   // Modal
   dom.modalClose.addEventListener('click', closeModal)
@@ -669,6 +1232,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Filter
   dom.filterDate.addEventListener('change', () => renderRoomDetail())
 
+  // Stats presets & custom date range
+  $$('.stats-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      statsPreset = btn.dataset.preset
+      $$('.stats-preset').forEach(b => b.classList.toggle('active', b === btn))
+      dom.statsCustomDates.style.display = statsPreset === 'custom' ? '' : 'none'
+      renderAdminStats()
+    })
+  })
+  dom.statsBtnApply.addEventListener('click', () => renderAdminStats())
+
   // Global price
   $('#btn-apply-global-price').addEventListener('click', () => {
     const price = dom.globalPriceInput.value
@@ -677,11 +1251,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   })
 
-  // Live update every second
+  // Live update every second — only update changing cells, not full re-render
   setInterval(() => {
-    if (currentPage === 'checkin') {
-      const room = getSelectedRoom()
-      if (room && isRoomOccupied(room)) renderRoomDetail()
-    }
+    if (currentPage !== 'checkin') return
+    const room = getSelectedRoom()
+    if (!room || !isRoomOccupied(room)) return
+
+    // Update stat: today hours
+    const todayRecords = room.records.filter(r => isToday(r.checkIn))
+    let totalMs = 0
+    todayRecords.forEach(r => { totalMs += getDurationMs(r.checkIn, r.checkOut) })
+    dom.statTodayHours.textContent = formatDurationShort(totalMs)
+
+    // Update live duration cells
+    document.querySelectorAll('[data-live-duration]').forEach(el => {
+      const id = el.dataset.liveDuration
+      if (!id) return
+      const checkIn = el.dataset.checkin
+      el.textContent = formatDuration(checkIn, null)
+    })
+
+    // Update live cost cells
+    document.querySelectorAll('[data-live-cost]').forEach(el => {
+      const id = el.dataset.liveCost
+      if (!id) return
+      const checkIn = el.dataset.checkin
+      const price = parseFloat(el.dataset.price) || 0
+      const itemsCost = parseFloat(el.dataset.itemsCost) || 0
+      const hourlyCost = calculateCost(checkIn, null, price)
+      el.textContent = (price || itemsCost) ? formatMoney(hourlyCost + itemsCost) : '—'
+    })
+
+    // Update live cost detail cells
+    document.querySelectorAll('[data-live-cost-detail]').forEach(el => {
+      const id = el.dataset.liveCostDetail
+      if (!id) return
+      const checkIn = el.dataset.checkin
+      const price = parseFloat(el.dataset.price) || 0
+      const itemsCost = parseFloat(el.dataset.itemsCost) || 0
+      const hourlyCost = calculateCost(checkIn, null, price)
+      el.textContent = `${formatMoney(hourlyCost)} + ${formatMoney(itemsCost)}`
+    })
   }, 1000)
 })
