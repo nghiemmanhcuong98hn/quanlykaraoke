@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self';" />
+  <title>Quản Lý Phòng</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="styles/index.css" />
+</head>
+
+<body>
+  <!-- ─── Custom Titlebar ──────────────────────────────────── -->
+  <header id="titlebar">
+    <div class="titlebar-drag">
+      <div class="titlebar-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      </div>
+      <span class="titlebar-title">Quản Lý Giờ Vào/Ra</span>
+    </div>
+    <div class="titlebar-controls">
+      <button id="btn-minimize" class="titlebar-btn" aria-label="Minimize">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect y="5" width="12" height="1.5" rx="0.75" fill="currentColor" />
+        </svg>
+      </button>
+      <button id="btn-maximize" class="titlebar-btn" aria-label="Maximize">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+        </svg>
+      </button>
+      <button id="btn-close" class="titlebar-btn titlebar-btn--close" aria-label="Close">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ─── App Layout ───────────────────────────────────────── -->
+  <div id="app-layout">
+
+    <!-- ─── Sidebar ────────────────────────────────────────── -->
+    <aside id="sidebar">
+      <!-- Navigation Tabs -->
+      <div class="sidebar-nav">
+        <button class="nav-tab active" data-page="checkin">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Vào/Ra
+        </button>
+        <button class="nav-tab" data-page="admin">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Quản lý
+        </button>
+      </div>
+
+      <!-- Sidebar: Checkin page -->
+      <div id="sidebar-checkin" class="sidebar-page">
+        <div class="sidebar-header">
+          <h2 class="sidebar-title">Phòng</h2>
+          <button id="btn-add-room" class="btn-icon" title="Thêm phòng">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </div>
+        <div id="room-list" class="room-list"></div>
+      </div>
+
+      <!-- Sidebar: Admin page -->
+      <div id="sidebar-admin" class="sidebar-page" style="display:none;">
+        <div class="sidebar-header">
+          <h2 class="sidebar-title">Quản lý</h2>
+        </div>
+        <div class="admin-menu">
+          <button class="admin-menu-item active" data-section="admin-rooms">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            Phòng
+          </button>
+          <button class="admin-menu-item" data-section="admin-room-types">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Loại phòng
+          </button>
+          <button class="admin-menu-item" data-section="admin-pricing">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Giá cả
+          </button>
+          <button class="admin-menu-item" data-section="admin-stats">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Thống kê
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ─── Main Content ───────────────────────────────────── -->
+    <main id="main-content">
+
+      <!-- ════════════ PAGE: CHECKIN ════════════ -->
+      <div id="page-checkin">
+        <div id="empty-state" class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </div>
+          <h2>Chọn một phòng</h2>
+          <p>Chọn phòng từ danh sách bên trái hoặc thêm phòng mới để bắt đầu</p>
+        </div>
+
+        <div id="room-detail" class="room-detail" style="display:none;">
+          <div class="room-header">
+            <div class="room-header-left">
+              <h1 id="room-name" class="room-name">Phòng 1</h1>
+              <span id="room-status" class="room-badge room-badge--empty">Trống</span>
+            </div>
+            <div class="room-header-actions">
+              <div class="price-input-group">
+                <label for="input-price" class="price-label">Giá/giờ:</label>
+                <input type="number" id="input-price" class="price-input" placeholder="0" min="0" step="1000" />
+                <span class="price-unit">₫</span>
+              </div>
+              <button id="btn-check-in" class="btn btn-success">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+                Vào
+              </button>
+              <button id="btn-check-out" class="btn btn-warning" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Ra
+              </button>
+              <button id="btn-delete-room" class="btn-icon btn-icon--danger" title="Xóa phòng">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--blue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Lượt vào hôm nay</span>
+                <span class="stat-card-value" id="stat-today-entries">0</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Tổng giờ hôm nay</span>
+                <span class="stat-card-value" id="stat-today-hours">0h 0m</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--purple">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Đang trong phòng</span>
+                <span class="stat-card-value" id="stat-current-in">0</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--orange">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Tổng lượt (tất cả)</span>
+                <span class="stat-card-value" id="stat-total-entries">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="filter-bar">
+            <div class="filter-bar-left"><h3>Lịch sử vào/ra</h3></div>
+            <div class="filter-bar-right">
+              <select id="filter-date" class="select-input">
+                <option value="today">Hôm nay</option>
+                <option value="all">Tất cả</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Giờ vào</th><th>Giờ ra</th><th>Thời gian</th><th>Thành tiền</th><th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody id="records-body"></tbody>
+            </table>
+            <div id="no-records" class="no-records" style="display:none;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+              <p>Chưa có lượt vào/ra nào</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════ PAGE: ADMIN ════════════ -->
+      <div id="page-admin" style="display:none;">
+
+        <!-- Section: Rooms -->
+        <div id="admin-rooms" class="admin-section">
+          <div class="admin-section-header">
+            <h2>Quản lý phòng</h2>
+            <button id="admin-btn-add-room" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Thêm phòng
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Tên phòng</th><th>Loại phòng</th><th>Giá/giờ</th><th>Trạng thái</th><th>Tổng lượt</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="admin-rooms-body"></tbody>
+            </table>
+            <div id="admin-rooms-empty" class="no-records" style="display:none;">
+              <p>Chưa có phòng nào</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Room Types -->
+        <div id="admin-room-types" class="admin-section" style="display:none;">
+          <div class="admin-section-header">
+            <h2>Loại phòng</h2>
+            <button id="admin-btn-add-type" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Thêm loại phòng
+            </button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Tên loại</th><th>Giá mặc định/giờ</th><th>Số phòng</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="admin-types-body"></tbody>
+            </table>
+            <div id="admin-types-empty" class="no-records" style="display:none;">
+              <p>Chưa có loại phòng nào</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Pricing -->
+        <div id="admin-pricing" class="admin-section" style="display:none;">
+          <div class="admin-section-header">
+            <h2>Quản lý giá cả</h2>
+          </div>
+
+          <!-- Global Price -->
+          <div class="pricing-card">
+            <div class="pricing-card-header">
+              <h3>Giá chung cho tất cả phòng</h3>
+              <p class="pricing-card-desc">Đặt một mức giá và áp dụng cho tất cả các phòng cùng lúc</p>
+            </div>
+            <div class="pricing-card-body">
+              <div class="pricing-row">
+                <div class="form-group" style="flex:1; margin-bottom:0;">
+                  <label class="form-label">Giá mỗi giờ (₫)</label>
+                  <input type="number" id="global-price-input" class="form-input" placeholder="VD: 50000" min="0" step="1000" />
+                </div>
+                <button id="btn-apply-global-price" class="btn btn-primary" style="align-self:flex-end;">Áp dụng tất cả</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Price by Room Type -->
+          <div class="pricing-card" style="margin-top:16px;">
+            <div class="pricing-card-header">
+              <h3>Giá theo loại phòng</h3>
+              <p class="pricing-card-desc">Thay đổi giá mặc định cho từng loại phòng và áp dụng cho các phòng thuộc loại đó</p>
+            </div>
+            <div class="pricing-card-body">
+              <div id="pricing-types-list"></div>
+              <div id="pricing-no-types" class="no-records" style="padding:24px;">
+                <p>Chưa có loại phòng. Hãy thêm loại phòng trước.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Stats -->
+        <div id="admin-stats" class="admin-section" style="display:none;">
+          <div class="admin-section-header">
+            <h2>Thống kê</h2>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Doanh thu hôm nay</span>
+                <span class="stat-card-value" id="stats-revenue-today">0₫</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--blue">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Doanh thu tháng này</span>
+                <span class="stat-card-value" id="stats-revenue-month">0₫</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--purple">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Tổng doanh thu</span>
+                <span class="stat-card-value" id="stats-revenue-all">0₫</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-card-icon stat-card-icon--orange">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div class="stat-card-info">
+                <span class="stat-card-label">Tổng lượt sử dụng</span>
+                <span class="stat-card-value" id="stats-total-usage">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Revenue by Room -->
+          <div style="margin-top: 24px;">
+            <h3 style="font-size:16px; font-weight:600; margin-bottom:12px;">Doanh thu theo phòng</h3>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th><th>Phòng</th><th>Loại</th><th>Lượt sử dụng</th><th>Tổng giờ</th><th>Doanh thu</th>
+                  </tr>
+                </thead>
+                <tbody id="stats-room-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ─── Modal ────────────────────────────────────────────── -->
+  <div id="modal-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Thêm phòng mới</h3>
+        <button id="modal-close" class="btn-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Dynamic content -->
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel" class="btn btn-ghost">Hủy</button>
+        <button id="modal-confirm" class="btn btn-primary">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Toast ────────────────────────────────────────────── -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="scripts/renderer.js"></script>
+</body>
+
+</html>

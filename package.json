@@ -1,0 +1,40 @@
+{
+          "name": "room-manager",
+          "version": "1.0.0",
+          "description": "Hệ thống Quản lý Giờ vào Giờ ra",
+          "main": "src/main/main.js",
+          "scripts": {
+                    "start": "electron .",
+                    "dev": "electron . --dev",
+                    "build": "electron-builder -w"
+          },
+          "build": {
+                    "appId": "com.roommanager.desk",
+                    "productName": "Room Manager",
+                    "win": {
+                              "target": [
+                                        "nsis",
+                                        "portable"
+                              ]
+                    },
+                    "files": [
+                              "src/**/*",
+                              ".env",
+                              "package.json"
+                    ],
+                    "directories": {
+                              "output": "dist"
+                    }
+          },
+          "keywords": [],
+          "author": "",
+          "license": "ISC",
+          "devDependencies": {
+                    "electron": "^35.1.5",
+                    "electron-builder": "^24.13.3"
+          },
+          "dependencies": {
+                    "dotenv": "^17.3.1",
+                    "mongoose": "^8.23.0"
+          }
+}
