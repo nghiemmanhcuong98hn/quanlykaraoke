@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
-const { connectDB, Room, RoomType, Item } = require('./db')
+const { connectDB, Room, RoomType, Item, ImportRecord } = require('./db')
 
 const isDev = process.argv.includes('--dev')
 
@@ -10,13 +10,13 @@ let mainWindow = null
 async function createWindow() {
   await connectDB()
 
-  mainWindow = new BrowserWindow({
+  const isMac = process.platform === 'darwin'
+
+  const windowOptions = {
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    frame: false,
-    titleBarStyle: 'hidden',
     backgroundColor: '#0a0a0f',
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
@@ -25,7 +25,17 @@ async function createWindow() {
       sandbox: true
     },
     show: false
-  })
+  }
+
+  if (isMac) {
+    windowOptions.titleBarStyle = 'hiddenInset'
+    windowOptions.trafficLightPosition = { x: 12, y: 10 }
+  } else {
+    windowOptions.frame = false
+    windowOptions.titleBarStyle = 'hidden'
+  }
+
+  mainWindow = new BrowserWindow(windowOptions)
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'))
   mainWindow.once('ready-to-show', () => mainWindow.show())
@@ -37,6 +47,12 @@ ipcMain.handle('db:get-data', async () => {
   const rooms = await Room.find().lean()
   const roomTypes = await RoomType.find().lean()
   const items = await Item.find().lean()
+  const importHistory = await ImportRecord.find()
+    .populate('itemId', 'name')
+    .sort({ importDate: -1 })
+    .limit(100)
+    .lean()
+
   return {
     rooms: rooms.map(r => ({
       ...r,
@@ -53,18 +69,28 @@ ipcMain.handle('db:get-data', async () => {
       }))
     })),
     roomTypes: roomTypes.map(t => ({ ...t, id: t._id.toString() })),
-    items: items.map(i => ({ ...i, id: i._id.toString() }))
+    items: items.map(i => ({ ...i, id: i._id.toString() })),
+    importHistory: importHistory.map(h => ({
+      ...h,
+      id: h._id.toString(),
+      itemId: h.itemId?._id?.toString() || h.itemId?.toString(),
+      itemName: h.itemId?.name || 'Sản phẩm đã xóa'
+    }))
   }
 })
 
 ipcMain.handle('db:save-room', async (event, data) => {
   let result
   if (data.id && data.id.length === 24) {
-    result = await Room.findByIdAndUpdate(data.id, {
-      name: data.name,
-      pricePerHour: data.pricePerHour,
-      roomTypeId: data.roomTypeId || null
-    }, { new: true })
+    result = await Room.findByIdAndUpdate(
+      data.id,
+      {
+        name: data.name,
+        pricePerHour: data.pricePerHour,
+        roomTypeId: data.roomTypeId || null
+      },
+      { new: true }
+    )
   } else {
     const room = new Room({
       name: data.name,
@@ -110,10 +136,14 @@ ipcMain.handle('db:delete-record', async (event, { roomId, recordId }) => {
 ipcMain.handle('db:save-room-type', async (event, data) => {
   let result
   if (data.id && data.id.length === 24) {
-    result = await RoomType.findByIdAndUpdate(data.id, {
-      name: data.name,
-      defaultPrice: data.defaultPrice
-    }, { new: true })
+    result = await RoomType.findByIdAndUpdate(
+      data.id,
+      {
+        name: data.name,
+        defaultPrice: data.defaultPrice
+      },
+      { new: true }
+    )
   } else {
     const type = new RoomType({ name: data.name, defaultPrice: data.defaultPrice })
     result = await type.save()
@@ -142,16 +172,20 @@ ipcMain.handle('db:apply-global-price', async (event, price) => {
 ipcMain.handle('db:save-item', async (event, data) => {
   let result
   if (data.id && data.id.length === 24) {
-    result = await Item.findByIdAndUpdate(data.id, {
-      name: data.name,
-      price: data.price,
-      category: data.category || ''
-    }, { new: true })
+    result = await Item.findByIdAndUpdate(
+      data.id,
+      {
+        name: data.name,
+        price: data.price,
+        stock: data.stock !== undefined ? data.stock : 0
+      },
+      { new: true }
+    )
   } else {
     const item = new Item({
       name: data.name,
       price: data.price,
-      category: data.category || ''
+      stock: data.stock || 0
     })
     result = await item.save()
   }
@@ -163,16 +197,38 @@ ipcMain.handle('db:delete-item', async (event, id) => {
   return result ? result.toObject() : null
 })
 
+console.log('Main: Registering db:import-items handler')
+ipcMain.handle('db:import-items', async (event, { itemId, quantity, importPrice, note }) => {
+  // Update Item stock
+  await Item.findByIdAndUpdate(itemId, { $inc: { stock: quantity } })
+  // Create ImportRecord
+  const record = new ImportRecord({
+    itemId,
+    quantity,
+    importPrice,
+    note
+  })
+  const result = await record.save()
+  return result.toObject()
+})
+
 ipcMain.handle('db:add-record-item', async (event, { roomId, recordId, itemId, name, price, quantity }) => {
   const room = await Room.findById(roomId)
   const record = room.records.id(recordId)
   if (!record) return null
+
   const existing = record.items.find(i => i.itemId?.toString() === itemId)
   if (existing) {
     existing.quantity += quantity
   } else {
     record.items.push({ itemId, name, price, quantity })
   }
+
+  // Decrease stock
+  if (itemId) {
+    await Item.findByIdAndUpdate(itemId, { $inc: { stock: -quantity } })
+  }
+
   const result = await room.save()
   return result.toObject()
 })
@@ -181,6 +237,13 @@ ipcMain.handle('db:remove-record-item', async (event, { roomId, recordId, record
   const room = await Room.findById(roomId)
   const record = room.records.id(recordId)
   if (!record) return null
+
+  const itemInRecord = record.items.find(i => i._id.toString() === recordItemId)
+  if (itemInRecord && itemInRecord.itemId) {
+    // Increase stock back
+    await Item.findByIdAndUpdate(itemInRecord.itemId, { $inc: { stock: itemInRecord.quantity } })
+  }
+
   record.items = record.items.filter(i => i._id.toString() !== recordItemId)
   const result = await room.save()
   return result.toObject()
@@ -190,8 +253,17 @@ ipcMain.handle('db:update-record-item', async (event, { roomId, recordId, record
   const room = await Room.findById(roomId)
   const record = room.records.id(recordId)
   if (!record) return null
-  const item = record.items.find(i => i._id.toString() === recordItemId)
-  if (item) item.quantity = quantity
+
+  const itemInRecord = record.items.find(i => i._id.toString() === recordItemId)
+  if (itemInRecord) {
+    const diff = quantity - itemInRecord.quantity
+    if (itemInRecord.itemId) {
+      // Adjust stock (if new qty > old qty, diff is positive, inc -diff = decrease stock)
+      await Item.findByIdAndUpdate(itemInRecord.itemId, { $inc: { stock: -diff } })
+    }
+    itemInRecord.quantity = quantity
+  }
+
   const result = await room.save()
   return result.toObject()
 })
@@ -212,6 +284,8 @@ ipcMain.on('window:maximize', () => {
   else mainWindow?.maximize()
 })
 ipcMain.on('window:close', () => mainWindow?.close())
+
+ipcMain.handle('app:get-platform', () => process.platform)
 
 // ─── App Lifecycle ──────────────────────────────────────────
 app.whenReady().then(() => {

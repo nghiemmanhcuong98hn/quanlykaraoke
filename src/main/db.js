@@ -2,24 +2,43 @@ const mongoose = require('mongoose')
 const path = require('path')
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') })
 
-const itemSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  price: { type: Number, default: 0 },
-  category: { type: String, default: '' }
-}, {
-  timestamps: true,
-  toObject: { virtuals: true },
-  toJSON: { virtuals: true }
-})
+const itemSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    price: { type: Number, default: 0 },
+    stock: { type: Number, default: 0 }
+  },
+  {
+    timestamps: true,
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true }
+  }
+)
 
-const roomTypeSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  defaultPrice: { type: Number, default: 0 }
-}, {
-  timestamps: true,
-  toObject: { virtuals: true },
-  toJSON: { virtuals: true }
-})
+const importRecordSchema = new mongoose.Schema(
+  {
+    itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+    quantity: { type: Number, required: true },
+    importPrice: { type: Number, default: 0 },
+    importDate: { type: Date, default: Date.now },
+    note: { type: String, default: '' }
+  },
+  {
+    timestamps: true
+  }
+)
+
+const roomTypeSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    defaultPrice: { type: Number, default: 0 }
+  },
+  {
+    timestamps: true,
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true }
+  }
+)
 
 const recordItemSchema = new mongoose.Schema({
   itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
@@ -34,20 +53,24 @@ const recordSchema = new mongoose.Schema({
   items: [recordItemSchema]
 })
 
-const roomSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  pricePerHour: { type: Number, default: 0 },
-  roomTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'RoomType', default: null },
-  records: [recordSchema]
-}, {
-  timestamps: true,
-  toObject: { virtuals: true },
-  toJSON: { virtuals: true }
-})
+const roomSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    pricePerHour: { type: Number, default: 0 },
+    roomTypeId: { type: mongoose.Schema.Types.ObjectId, ref: 'RoomType', default: null },
+    records: [recordSchema]
+  },
+  {
+    timestamps: true,
+    toObject: { virtuals: true },
+    toJSON: { virtuals: true }
+  }
+)
 
 const Room = mongoose.model('Room', roomSchema)
 const RoomType = mongoose.model('RoomType', roomTypeSchema)
 const Item = mongoose.model('Item', itemSchema)
+const ImportRecord = mongoose.model('ImportRecord', importRecordSchema)
 
 async function connectDB() {
   try {
@@ -60,4 +83,4 @@ async function connectDB() {
   }
 }
 
-module.exports = { connectDB, Room, RoomType, Item }
+module.exports = { connectDB, Room, RoomType, Item, ImportRecord }
