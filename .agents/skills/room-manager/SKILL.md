@@ -140,3 +140,8 @@ Các helper nằm trong `src/renderer/scripts/utils/`:
   - Xóa `category` khỏi `Item` schema, backend handlers và UI (table, modals, actions).
 - **Đồng bộ Giao diện Modal:**
   - Tăng chiều rộng (wide layout - 800px) cho **tất cả** các modal (Phòng, Loại phòng, Sản phẩm, Nhập hàng, Chọn món) bằng class `modal--wide`.
+- **Thêm tính năng Dark/Light Mode:**
+  - **CSS:** Định nghĩa biến màu sáng trong class `.light-theme`. Darken màu text xám để tăng độ tương phản.
+  - **macOS Fix:** Điều chỉnh CSS để nút chuyển chế độ luôn hiển thị trong titlebar controls trên macOS (vốn mặc định ẩn containers này).
+  - **JavaScript:** Thêm `initTheme`, `applyTheme`, và `toggleTheme` với `localStorage` để ghi nhớ lựa chọn.
+  - **Charts:** Cập nhật Chart.js (legend, tooltip, grid) tự động đổi màu theo theme để đảm bảo khả năng hiển thị trên nền trắng.

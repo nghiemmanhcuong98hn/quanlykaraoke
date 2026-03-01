@@ -28,6 +28,7 @@ Ghi chú tổng hợp về tính năng, logic cốt lõi và cấu trúc dự á
   - **Quản lý Sản phẩm:** CRUD sản phẩm/dịch vụ (tên, giá, tồn kho). Hỗ trợ nhập hàng và xem lịch sử nhập.
   - **Quản lý Giá:** Chức năng áp dụng giá theo loại phòng hoặc giá chung toàn hệ thống.
   - **Thống kê:** Doanh thu Today/Month/Total, bảng xếp hạng doanh thu và **chi tiết lượt sử dụng theo phòng**.
+- **Chủ đề (Dark/Light Mode):** Chuyển đổi linh hoạt giữa giao diện tối và sáng, tự động lưu lại lựa chọn của người dùng.
 
 ## 3. Kiến trúc Dữ liệu & Database
 

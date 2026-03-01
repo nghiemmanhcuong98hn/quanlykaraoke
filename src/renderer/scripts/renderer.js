@@ -110,6 +110,33 @@ function getRoomTypeName(typeId) {
   return t ? t.name : '—'
 }
 
+// ─── Theme Management ───────────────────────────────────────
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'dark'
+  applyTheme(savedTheme)
+}
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('light-theme')
+    $('#theme-icon-dark').style.display = 'none'
+    $('#theme-icon-light').style.display = 'block'
+  } else {
+    document.body.classList.remove('light-theme')
+    $('#theme-icon-dark').style.display = 'block'
+    $('#theme-icon-light').style.display = 'none'
+  }
+  // Refresh charts if they exist
+  if (currentPage === 'admin' && currentAdminSection === 'admin-stats') {
+    renderAdminStats()
+  }
+}
+function toggleTheme() {
+  const isLight = document.body.classList.contains('light-theme')
+  const newTheme = isLight ? 'dark' : 'light'
+  applyTheme(newTheme)
+  localStorage.setItem('theme', newTheme)
+}
+
 // ═══════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════
@@ -576,13 +603,18 @@ function renderChart_Daily(dailyData) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: { color: '#8b8b9e', font: { size: 11, family: 'Inter' }, boxWidth: 12, padding: 16 }
+          labels: {
+            color: document.body.classList.contains('light-theme') ? '#334155' : '#8b8b9e',
+            font: { size: 11, family: 'Inter' },
+            boxWidth: 12,
+            padding: 16
+          }
         },
         tooltip: {
-          backgroundColor: '#1a1a24',
-          titleColor: '#f0f0f5',
-          bodyColor: '#8b8b9e',
-          borderColor: 'rgba(255,255,255,0.08)',
+          backgroundColor: document.body.classList.contains('light-theme') ? '#ffffff' : '#1a1a24',
+          titleColor: document.body.classList.contains('light-theme') ? '#1e293b' : '#f0f0f5',
+          bodyColor: document.body.classList.contains('light-theme') ? '#475569' : '#8b8b9e',
+          borderColor: 'rgba(0,0,0,0.1)',
           borderWidth: 1,
           padding: 10,
           callbacks: {
@@ -592,13 +624,24 @@ function renderChart_Daily(dailyData) {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#5a5a6e', font: { size: 10, family: 'Inter' } }
+          grid: {
+            color: document.body.classList.contains('light-theme')
+              ? 'rgba(0,0,0,0.05)'
+              : 'rgba(255,255,255,0.04)'
+          },
+          ticks: {
+            color: document.body.classList.contains('light-theme') ? '#475569' : '#5a5a6e',
+            font: { size: 10, family: 'Inter' }
+          }
         },
         y: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
+          grid: {
+            color: document.body.classList.contains('light-theme')
+              ? 'rgba(0,0,0,0.05)'
+              : 'rgba(255,255,255,0.04)'
+          },
           ticks: {
-            color: '#5a5a6e',
+            color: document.body.classList.contains('light-theme') ? '#475569' : '#5a5a6e',
             font: { size: 10, family: 'Inter' },
             callback: v => (v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? v / 1000 + 'K' : v)
           }
@@ -636,7 +679,7 @@ function renderChart_Room(roomStats) {
         {
           data: top.map(rs => rs.totalRevenue),
           backgroundColor: colors.slice(0, top.length),
-          borderColor: '#111118',
+          borderColor: document.body.classList.contains('light-theme') ? '#ffffff' : '#111118',
           borderWidth: 2
         }
       ]
@@ -649,13 +692,18 @@ function renderChart_Room(roomStats) {
       plugins: {
         legend: {
           position: 'right',
-          labels: { color: '#8b8b9e', font: { size: 11, family: 'Inter' }, boxWidth: 12, padding: 10 }
+          labels: {
+            color: document.body.classList.contains('light-theme') ? '#334155' : '#8b8b9e',
+            font: { size: 11, family: 'Inter' },
+            boxWidth: 12,
+            padding: 10
+          }
         },
         tooltip: {
-          backgroundColor: '#1a1a24',
-          titleColor: '#f0f0f5',
-          bodyColor: '#8b8b9e',
-          borderColor: 'rgba(255,255,255,0.08)',
+          backgroundColor: document.body.classList.contains('light-theme') ? '#ffffff' : '#1a1a24',
+          titleColor: document.body.classList.contains('light-theme') ? '#1e293b' : '#f0f0f5',
+          bodyColor: document.body.classList.contains('light-theme') ? '#475569' : '#8b8b9e',
+          borderColor: 'rgba(0,0,0,0.1)',
           borderWidth: 1,
           padding: 10,
           callbacks: {
@@ -1499,6 +1547,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-minimize').addEventListener('click', () => window.electronAPI.minimize())
   $('#btn-maximize').addEventListener('click', () => window.electronAPI.maximize())
   $('#btn-close').addEventListener('click', () => window.electronAPI.close())
+
+  // Theme toggle
+  $('#btn-theme-toggle').addEventListener('click', toggleTheme)
+  initTheme()
 
   // Platform detection — add class to body for platform-specific CSS
   try {
