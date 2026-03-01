@@ -172,22 +172,49 @@ ipcMain.handle('db:apply-global-price', async (event, price) => {
 ipcMain.handle('db:save-item', async (event, data) => {
   let result
   if (data.id && data.id.length === 24) {
+    // Audit stock changes
+    const oldItem = await Item.findById(data.id)
+    const newStock = data.stock !== undefined ? data.stock : 0
+    const diff = newStock - (oldItem?.stock || 0)
+
     result = await Item.findByIdAndUpdate(
       data.id,
       {
         name: data.name,
         price: data.price,
-        stock: data.stock !== undefined ? data.stock : 0
+        stock: newStock
       },
       { new: true }
     )
+
+    if (diff !== 0) {
+      const imp = new ImportRecord({
+        itemId: data.id,
+        quantity: diff,
+        importPrice: 0,
+        note: `Điều chỉnh số lượng khi sửa thông tin sản phẩm (Diff: ${diff})`
+      })
+      await imp.save()
+    }
   } else {
+    // New item
     const item = new Item({
       name: data.name,
       price: data.price,
       stock: data.stock || 0
     })
     result = await item.save()
+    
+    // Create initial history if stock > 0
+    if (item.stock > 0) {
+      const imp = new ImportRecord({
+        itemId: item._id,
+        quantity: item.stock,
+        importPrice: 0,
+        note: `Nhập tồn đầu kỳ khi tạo sản phẩm`
+      })
+      await imp.save()
+    }
   }
   return result ? result.toObject() : null
 })
@@ -210,6 +237,43 @@ ipcMain.handle('db:import-items', async (event, { itemId, quantity, importPrice,
   })
   const result = await record.save()
   return result.toObject()
+})
+
+ipcMain.handle('db:delete-import', async (event, id) => {
+  const imp = await ImportRecord.findById(id)
+  if (!imp) return null
+  
+  // Revert stock adjustment
+  if (imp.itemId) {
+    await Item.findByIdAndUpdate(imp.itemId, { $inc: { stock: -imp.quantity } })
+  }
+  
+  const result = await ImportRecord.findByIdAndDelete(id)
+  return result ? result.toObject() : null
+})
+
+ipcMain.handle('db:update-import', async (event, { id, itemId, quantity, importPrice, note }) => {
+  const imp = await ImportRecord.findById(id)
+  if (!imp) return null
+  
+  // Adjust stock if quantity or itemId changed
+  if (imp.itemId.toString() === itemId) {
+    const diff = quantity - imp.quantity
+    await Item.findByIdAndUpdate(itemId, { $inc: { stock: diff } })
+  } else {
+    // Item changed? Undo old item stock, add new item stock
+    await Item.findByIdAndUpdate(imp.itemId, { $inc: { stock: -imp.quantity } })
+    await Item.findByIdAndUpdate(itemId, { $inc: { stock: quantity } })
+  }
+  
+  const result = await ImportRecord.findByIdAndUpdate(id, {
+    itemId,
+    quantity,
+    importPrice,
+    note
+  }, { new: true })
+  
+  return result ? result.toObject() : null
 })
 
 ipcMain.handle('db:add-record-item', async (event, { roomId, recordId, itemId, name, price, quantity }) => {

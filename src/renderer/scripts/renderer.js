@@ -384,11 +384,13 @@ function renderAdminItems() {
       <td><span class="time-value">${escapeHtml(item.name)}</span></td>
       <td><span class="money-value">${formatMoney(item.price)}</span></td>
       <td><span class="count-badge ${item.stock <= 5 ? 'count-badge--danger' : ''}">${item.stock || 0}</span></td>
-      <td><div class="table-actions">
-        <button class="btn btn-xs btn-ghost btn-import-item" data-id="${item.id}">Nhập</button>
-        <button class="btn-icon btn-edit-item" data-id="${item.id}" title="Sửa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="btn-icon btn-icon--danger btn-del-item" data-id="${item.id}" title="Xóa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-      </div></td>`
+      <td>
+        <div class="table-actions">
+          <button class="btn btn-xs btn-ghost btn-import-item" data-id="${item.id}" style="margin-right:2px">Nhập</button>
+          <button class="btn-icon btn-edit-item" data-id="${item.id}" title="Sửa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="btn-icon btn-icon--danger btn-del-item" data-id="${item.id}" title="Xóa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </td>`
     dom.adminItemsBody.appendChild(tr)
   })
 
@@ -416,12 +418,34 @@ function renderAdminImports() {
   importHistory.forEach(h => {
     const tr = document.createElement('tr')
     tr.innerHTML = `
-      <td style="font-size:12px;color:var(--text-tertiary)">${formatDate(h.importDate)} ${formatTime(h.importDate)}</td>
-      <td><span class="time-value">${escapeHtml(h.itemName)}</span></td>
-      <td><span class="count-badge">${h.quantity}</span></td>
-      <td><span class="money-value">${formatMoney(h.importPrice)}</span></td>
-      <td style="font-size:12px;color:var(--text-tertiary)">${h.note ? escapeHtml(h.note) : '—'}</td>`
+      <td style="font-size:12px;color:var(--text-tertiary)">${h.importDate ? formatDate(h.importDate) + ' ' + formatTime(h.importDate) : '—'}</td>
+      <td><span class="time-value">${escapeHtml(h.itemName || 'Sản phẩm')}</span></td>
+      <td><span class="count-badge ${h.quantity < 0 ? 'count-badge--danger' : ''}">${h.quantity || 0}</span></td>
+      <td><span class="money-value">${formatMoney(h.importPrice || 0)}</span></td>
+      <td style="font-size:12px;color:var(--text-tertiary)">${h.note ? escapeHtml(h.note) : '—'}</td>
+      <td>
+        <div class="table-actions">
+          <button class="btn-icon btn-edit-import" data-id="${h.id}" title="Sửa">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-icon btn-icon--danger btn-del-import" data-id="${h.id}" title="Xóa">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </td>`
     dom.adminImportsBody.appendChild(tr)
+  })
+
+  // Bind events
+  dom.adminImportsBody.querySelectorAll('.btn-edit-import').forEach(btn => {
+    btn.addEventListener('click', () => openEditImportModal(btn.dataset.id))
+  })
+  dom.adminImportsBody.querySelectorAll('.btn-del-import').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm('Xóa bản ghi lịch sử này? Số lượng tồn kho sẽ được hoàn trả tương ứng.')) {
+        deleteImport(btn.dataset.id)
+      }
+    })
   })
 }
 
@@ -1039,6 +1063,14 @@ async function removeRecordItem(roomId, recordId, recordItemId) {
   renderRoomDetail()
 }
 
+async function deleteImport(id) {
+  await window.electronAPI.invoke('db:delete-import', id)
+  await loadData()
+  renderAdminImports()
+  renderAdminItems()
+  showToast('Đã xóa bản ghi nhập hàng', 'danger')
+}
+
 async function updateRecordTimes(roomId, recordId, checkIn, checkOut) {
   await window.electronAPI.invoke('db:update-record-times', { roomId, recordId, checkIn, checkOut })
   await loadData()
@@ -1182,15 +1214,27 @@ function openRecordDetailModal(roomId, recordId) {
   // Items list
   let itemsHtml = ''
   if (record.items && record.items.length) {
-    record.items.forEach(ri => {
-      itemsHtml += `
-        <div class="record-item-row">
-          <span class="record-item-name">${escapeHtml(ri.name)}</span>
-          <span class="record-item-price">${formatMoney(ri.price)}</span>
-          <span class="record-item-qty">× ${ri.quantity}</span>
-          <span class="record-item-subtotal">${formatMoney(ri.price * ri.quantity)}</span>
-        </div>`
-    })
+    itemsHtml = `
+      <table class="data-table" style="background:var(--bg-primary); border-radius:var(--radius-sm);">
+        <thead>
+          <tr>
+            <th style="width:50%">Tên sản phẩm</th>
+            <th style="text-align:right">Đơn giá</th>
+            <th style="text-align:center">SL</th>
+            <th style="text-align:right">Thành tiền</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${record.items.map(ri => `
+            <tr>
+              <td><span style="font-weight:500; color:var(--text-primary);">${escapeHtml(ri.name)}</span></td>
+              <td style="text-align:right">${formatMoney(ri.price)}</td>
+              <td style="text-align:center">${ri.quantity}</td>
+              <td style="text-align:right"><span class="money-value">${formatMoney(ri.price * ri.quantity)}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`
   } else {
     itemsHtml = '<div class="record-items-empty">Chưa có sản phẩm nào</div>'
   }
@@ -1352,24 +1396,78 @@ async function handleImportSave() {
   const qty = parseInt($('#m-import-qty').value) || 0
   const price = parseInt($('#m-import-price').value) || 0
   const note = $('#m-import-note').value.trim()
+  const itId = $('#m-import-item-select')?.value || editingId
 
-  if (qty <= 0) {
-    showToast('Số lượng phải lớn hơn 0', 'warning')
+  if (!itId) {
+    showToast('Chọn sản phẩm', 'warning')
     return
   }
 
-  await window.electronAPI.invoke('db:import-items', {
-    itemId: editingId,
-    quantity: qty,
-    importPrice: price,
-    note
-  })
+  if (qty === 0) {
+    showToast('Số lượng không thể bằng 0', 'warning')
+    return
+  }
+
+  if (modalMode === 'import-item') {
+    await window.electronAPI.invoke('db:import-items', {
+      itemId: itId,
+      quantity: qty,
+      importPrice: price,
+      note
+    })
+    showToast('Đã nhập hàng thành công', 'success')
+  } else if (modalMode === 'edit-import') {
+    await window.electronAPI.invoke('db:update-import', {
+      id: editingId,
+      itemId: itId,
+      quantity: qty,
+      importPrice: price,
+      note
+    })
+    showToast('Đã cập nhật bản ghi', 'success')
+  }
 
   await loadData()
   renderAdminItems()
   renderAdminImports()
   closeModal()
-  showToast('Đã nhập hàng thành công', 'success')
+}
+
+function openEditImportModal(id) {
+  const h = importHistory.find(x => x.id === id)
+  if (!h) return
+  modalMode = 'edit-import'
+  editingId = id
+
+  dom.modalTitle.textContent = 'Sửa lịch sử nhập/điều chỉnh'
+  document.querySelector('.modal').classList.add('modal--wide')
+
+  let itemOpts = ''
+  items.forEach(item => {
+    itemOpts += `<option value="${item.id}" ${item.id === h.itemId ? 'selected' : ''}>${escapeHtml(item.name)} (Tồn: ${item.stock})</option>`
+  })
+
+  dom.modalBody.innerHTML = `
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Sản phẩm</label>
+      <select id="m-import-item-select" class="form-input">${itemOpts}</select>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Số lượng (Dùng số âm để giảm tồn)</label>
+      <input type="number" id="m-import-qty" class="form-input" value="${h.quantity}" />
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Giá nhập đơn vị (₫)</label>
+      <input type="number" id="m-import-price" class="form-input" value="${h.importPrice}" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ghi chú</label>
+      <input type="text" id="m-import-note" class="form-input" value="${escapeHtml(h.note || '')}" />
+    </div>`
+
+  dom.modalCancel.style.display = ''
+  dom.modalConfirm.textContent = 'Lưu thay đổi'
+  openModal()
 }
 
 function openRecordItemsModal(roomId, recordId) {
@@ -1392,7 +1490,7 @@ function openRecordItemsModal(roomId, recordId) {
         <div class="record-item-row">
           <span class="record-item-name">${escapeHtml(ri.name)}</span>
           <span class="record-item-price">${formatMoney(ri.price)}</span>
-          <span class="record-item-qty-wrap">×<input type="number" class="record-item-qty-input" data-ri-id="${ri._id}" data-item-id="${ri.itemId}" data-price="${ri.price}" value="${ri.quantity}" min="1" /></span>
+          <span class="record-item-qty-wrap">×<button class="btn-qty btn-qty-minus" data-ri-id="${ri._id}">-</button><input type="number" class="record-item-qty-input" data-ri-id="${ri._id}" data-item-id="${ri.itemId}" data-price="${ri.price}" value="${ri.quantity}" min="1" /><button class="btn-qty btn-qty-plus" data-ri-id="${ri._id}">+</button></span>
           <span class="record-item-subtotal" data-subtotal-id="${ri._id}">${formatMoney(ri.price * ri.quantity)}</span>
           <button class="btn-icon btn-icon--danger btn-remove-ri" data-ri-id="${ri._id}" title="Xóa" style="width:24px;height:24px;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -1408,9 +1506,9 @@ function openRecordItemsModal(roomId, recordId) {
   // Build add item form
   let selectOptions = '<option value="">— Chọn sản phẩm —</option>'
   items.forEach(item => {
-    const stockStr =
-      item.stock <= 5 ? `<span style="color:var(--danger)">Hết hàng</span>` : `Tồn: ${item.stock}`
-    selectOptions += `<option value="${item.id}">${escapeHtml(item.name)} (Tồn: ${item.stock})</option>`
+    const stock = item.stock || 0
+    const stockLabel = stock <= 0 ? 'Hết hàng' : `Tồn: ${stock}`
+    selectOptions += `<option value="${item.id}">${escapeHtml(item.name)} (${stockLabel})</option>`
   })
 
   dom.modalBody.innerHTML = `
@@ -1419,13 +1517,18 @@ function openRecordItemsModal(roomId, recordId) {
       ${totalItemsCost ? `<div class="record-items-total">Tổng sản phẩm: <span class="total-amount">${formatMoney(totalItemsCost)}</span></div>` : ''}
       <div class="record-items-add-form">
         <select id="m-select-item" class="form-input">${selectOptions}</select>
-        <input type="number" id="m-item-qty" class="form-input" value="1" min="1" style="width:60px;text-align:center;" />
+        <div class="record-item-qty-wrap" style="min-width:0;gap:4px;">
+  <button class="btn-qty btn-qty-minus" data-target="m-item-qty">-</button>
+  <input type="number" id="m-item-qty" class="form-input" value="1" min="1" style="width:64px;text-align:center;padding:5px;" />
+  <button class="btn-qty btn-qty-plus" data-target="m-item-qty">+</button>
+</div>
         <button id="m-btn-add-ri" class="btn btn-sm btn-primary">Thêm</button>
       </div>
     </div>`
 
-  dom.modalCancel.style.display = 'none'
-  dom.modalConfirm.textContent = 'Đóng'
+  dom.modalCancel.style.display = ''
+  dom.modalConfirm.textContent = 'Lưu thay đổi'
+  dom.modalConfirm.classList.add('btn-primary')
   dom.modalOverlay.style.display = ''
 
   // Bind events for record items modal
@@ -1453,42 +1556,76 @@ function openRecordItemsModal(roomId, recordId) {
 
     document.querySelectorAll('.btn-remove-ri').forEach(btn => {
       btn.addEventListener('click', async () => {
-        await removeRecordItem(roomId, recordId, btn.dataset.riId)
-        showToast('Đã xóa sản phẩm', 'danger')
-        openRecordItemsModal(roomId, recordId)
+        if (confirm('Xóa sản phẩm này khỏi lượt?')) {
+          await removeRecordItem(roomId, recordId, btn.dataset.riId)
+          showToast('Đã xóa sản phẩm', 'danger')
+          openRecordItemsModal(roomId, recordId)
+        }
       })
     })
 
-    // Bind quantity edit
-    let qtyDebounce = null
+    // Bind plus/minus buttons
+    document.querySelectorAll('.btn-qty-minus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target
+        if (targetId) {
+          const input = $(`#${targetId}`)
+          if (input) {
+            input.value = Math.max(1, (parseInt(input.value) || 1) - 1)
+            input.dispatchEvent(new Event('input'))
+            input.dispatchEvent(new Event('change'))
+          }
+        } else {
+          const riId = btn.dataset.riId
+          const input = document.querySelector(`.record-item-qty-input[data-ri-id="${riId}"]`)
+          if (input) {
+            input.value = Math.max(1, (parseInt(input.value) || 1) - 1)
+            input.dispatchEvent(new Event('input'))
+            input.dispatchEvent(new Event('change'))
+          }
+        }
+      })
+    })
+
+    document.querySelectorAll('.btn-qty-plus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target
+        if (targetId) {
+          const input = $(`#${targetId}`)
+          if (input) {
+            input.value = (parseInt(input.value) || 1) + 1
+            input.dispatchEvent(new Event('input'))
+            input.dispatchEvent(new Event('change'))
+          }
+        } else {
+          const riId = btn.dataset.riId
+          const input = document.querySelector(`.record-item-qty-input[data-ri-id="${riId}"]`)
+          if (input) {
+            input.value = (parseInt(input.value) || 1) + 1
+            input.dispatchEvent(new Event('input'))
+            input.dispatchEvent(new Event('change'))
+          }
+        }
+      })
+    })
+
+    // Bind quantity edit (visual update only)
     document.querySelectorAll('.record-item-qty-input').forEach(input => {
       input.addEventListener('input', () => {
         const price = parseFloat(input.dataset.price) || 0
         const qty = parseInt(input.value) || 1
         const subtotalEl = document.querySelector(`[data-subtotal-id="${input.dataset.riId}"]`)
         if (subtotalEl) subtotalEl.textContent = formatMoney(price * qty)
-      })
-      input.addEventListener('change', () => {
-        clearTimeout(qtyDebounce)
-        const riId = input.dataset.riId
-        const qty = Math.max(1, parseInt(input.value) || 1)
-        input.value = qty
-        qtyDebounce = setTimeout(async () => {
-          await window.electronAPI.invoke('db:update-record-item', {
-            roomId,
-            recordId,
-            recordItemId: riId,
-            quantity: qty
-          })
-          await loadData()
-          renderRoomDetail()
-          // Update total in modal
-          const room2 = rooms.find(r => r.id === roomId)
-          const record2 = room2 && room2.records.find(r => r._id === recordId)
-          const totalEl = document.querySelector('.record-items-total .total-amount')
-          if (totalEl && record2) totalEl.textContent = formatMoney(calculateItemsCost(record2.items))
-          showToast('Đã cập nhật số lượng', 'success')
-        }, 300)
+
+        // Update total in modal visually
+        let tempTotal = 0
+        document.querySelectorAll('.record-item-qty-input').forEach(inp => {
+          const p = parseFloat(inp.dataset.price) || 0
+          const q = parseInt(inp.value) || 1
+          tempTotal += p * q
+        })
+        const totalEl = document.querySelector('.record-items-total .total-amount')
+        if (totalEl) totalEl.textContent = formatMoney(tempTotal)
       })
     })
   }, 50)
@@ -1513,7 +1650,7 @@ function closeModal() {
   editingRoomId = null
 }
 
-function submitModal() {
+async function submitModal() {
   if (modalMode === 'add-room') {
     addRoom($('#m-name')?.value, $('#m-price')?.value, $('#m-type')?.value)
   } else if (modalMode === 'edit-room') {
@@ -1526,12 +1663,31 @@ function submitModal() {
     addItem($('#m-iname')?.value, $('#m-iprice')?.value, $('#m-istock')?.value)
   } else if (modalMode === 'edit-item') {
     editItem(editingId, $('#m-iname')?.value, $('#m-iprice')?.value, $('#m-istock')?.value)
-  } else if (modalMode === 'import-item') {
+  } else if (modalMode === 'import-item' || modalMode === 'edit-import') {
     handleImportSave()
     return
   } else if (modalMode === 'record-items') {
-    closeModal()
-    return
+    const inputs = document.querySelectorAll('.record-item-qty-input')
+    const updates = []
+    inputs.forEach(input => {
+      updates.push({
+        recordItemId: input.dataset.riId,
+        quantity: parseInt(input.value) || 1
+      })
+    })
+
+    // Show loading state if needed, but for few items it's fast
+    for (const update of updates) {
+      await window.electronAPI.invoke('db:update-record-item', {
+        roomId: editingRoomId,
+        recordId: editingId,
+        recordItemId: update.recordItemId,
+        quantity: update.quantity
+      })
+    }
+    await loadData()
+    renderRoomDetail()
+    showToast('Đã lưu thay đổi số lượng', 'success')
   } else if (modalMode === 'record-detail') {
     closeModal()
     return

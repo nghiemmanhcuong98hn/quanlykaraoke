@@ -47,7 +47,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'db:add-record-item',
       'db:remove-record-item',
       'db:update-record-item',
-      'db:update-record-times'
+      'db:update-record-times',
+      'db:update-import',
+      'db:delete-import'
     ]
     if (allowedChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

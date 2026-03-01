@@ -37,6 +37,9 @@ Dự án sử dụng mô hình **3-layer (MvC Pattern)** trong Electron:
 - **Re-rendering:** Sau mỗi Action thành công (`addRoom`, `checkIn`, `checkOut`), Mapper (Renderer) gọi `await loadData()` để lấy trạng thái mới nhất từ MongoDB và vẽ lại UI.
 - **Real-time:** `setInterval` 1 giây ở Renderer chỉ cập nhật **targeted cells** (duration, cost) cho các phòng đang "occupied" — KHÔNG rebuild toàn bộ bảng để tránh nhấp nháy UI. Dữ liệu live được lưu qua `data-*` attributes trên DOM.
 - **UI Standard:** Toàn bộ modal phải sử dụng class `.modal--wide` (800px) để đảm bảo không gian hiển thị và tính đồng bộ. Thêm `document.querySelector('.modal').classList.add('modal--wide')` trước khi gọi `openModal()`.
+- **UX Policy:**
+  - Các modal cho phép chỉnh sửa nhiều giá trị cùng lúc (như số lượng sản phẩm, giá hàng loạt) PHẢI sử dụng nút "Lưu" (Confirm) để thực hiện lưu một lần duy nhất, thay vì tự động lưu (auto-save) để tránh gây phiền hà cho người dùng và tối ưu hiệu suất DB.
+  - **Bắt buộc Confirmation cho hành động Xóa:** Mọi thao tác Xóa (Xóa phòng, Xóa loại phòng, Xóa sản phẩm, Xóa lượt vào/ra, Xóa lịch sử nhập) PHẢI hiển thị thông báo xác nhận (`confirm()`) trước khi thực thi để tránh mất mát dữ liệu do nhầm lẫn.
 
 ### Logic Nghiệp vụ (Business Rules)
 
@@ -144,4 +147,13 @@ Các helper nằm trong `src/renderer/scripts/utils/`:
   - **CSS:** Định nghĩa biến màu sáng trong class `.light-theme`. Darken màu text xám để tăng độ tương phản.
   - **macOS Fix:** Điều chỉnh CSS để nút chuyển chế độ luôn hiển thị trong titlebar controls trên macOS (vốn mặc định ẩn containers này).
   - **JavaScript:** Thêm `initTheme`, `applyTheme`, và `toggleTheme` với `localStorage` để ghi nhớ lựa chọn.
-  - **Charts:** Cập nhật Chart.js (legend, tooltip, grid) tự động đổi màu theo theme để đảm bảo khả năng hiển thị trên nền trắng.
+  - **Cải tiến modal Sản phẩm sử dụng:**
+  - Thêm nút cộng/trừ (+/-) trực quan cho việc điều chỉnh số lượng sản phẩm.
+  - Tăng kích thước ô nhập liệu (input width) để dễ thao tác hơn.
+  - Thay đổi cơ chế lưu: Chuyển từ tự động lưu (debounce auto-save) sang lưu thủ công bằng nút "Lưu thay đổi" để ngăn chặn việc hiển thị thông báo (toast) liên tục gây khó chịu.
+  - Cập nhật hàm `submitModal` thành `async` để xử lý lưu hàng loạt sản phẩm đồng bộ.
+- **Nâng cấp Hệ thống Tồn kho & Lịch sử nhập:**
+  - Đảm bảo mọi thay đổi số lượng tồn kho (khi tạo mới SP hoặc sửa thông tin SP trong Admin) đều được lưu vào **Lịch sử nhập/điều chỉnh** để tránh thất thoát.
+  - Thêm tính năng **CRUD đầy đủ cho Lịch sử nhập**: Cho phép Sửa và Xóa các bản ghi nhập hàng, tự động hoàn trả/điều chỉnh tồn kho tương ứng.
+  - Giao diện Admin: Thêm cột hành động (Sửa/Xóa) cho bảng Lịch sử nhập.
+- **Cập nhật UX Policy trong SKILL.md:** Quy định bắt buộc dùng nút Lưu cho các thao tác chỉnh sửa hàng loạt trong modal.

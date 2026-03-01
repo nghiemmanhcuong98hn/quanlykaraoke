@@ -669,6 +669,7 @@ body.platform-darwin .titlebar-drag {
   font-size: 13px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
 }
 .data-table tbody tr {
   transition: background var(--duration-fast) ease;
@@ -1213,11 +1214,11 @@ body.platform-darwin .titlebar-drag {
   font-size: 13px;
   color: var(--text-secondary);
   font-weight: 600;
-  min-width: 54px;
+  min-width: 110px;
   justify-content: center;
 }
 .record-item-qty-input {
-  width: 38px;
+  width: 60px;
   padding: 3px 4px;
   text-align: center;
   background: var(--bg-primary);
@@ -1229,6 +1230,7 @@ body.platform-darwin .titlebar-drag {
   font-family: inherit;
   outline: none;
   -moz-appearance: textfield;
+  appearance: textfield;
   transition: border-color var(--duration-fast) ease;
 }
 .record-item-qty-input::-webkit-inner-spin-button,
@@ -1404,6 +1406,35 @@ body.platform-darwin .titlebar-drag {
 .record-detail-cost-value.money-value {
   color: var(--text-primary);
 }
+
+/* Quantity Adjust Buttons */
+.btn-qty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all var(--duration-fast) ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+.btn-qty:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color-hover);
+  color: var(--text-primary);
+}
+.btn-qty:active {
+  background: var(--bg-active);
+  transform: scale(0.95);
+}
+
 
 .record-detail-cost-total {
   background: var(--bg-tertiary);
@@ -1610,4 +1641,27 @@ body.platform-darwin .titlebar-drag {
   height: 220px;
   max-width: 320px;
   margin: 0 auto;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+}
+
+td.table-actions {
+  text-align: right;
+}
+
+.table-actions .btn-icon, 
+.table-actions .btn {
+  margin: 0;
+}
+
+.count-badge--danger {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
 }
